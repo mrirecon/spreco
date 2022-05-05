@@ -10,7 +10,7 @@ setup(
         'tf-slim==1.1.0',
         'numpy',
         'pillow==8.2.0',
-        'matplotlib==3.3.4',
+        'matplotlib==3.1.3',
         'scikit-image==0.18.1',
         'pyyaml==5.4.1',
         'tqdm'
