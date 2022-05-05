@@ -1,0 +1,22 @@
+burn_in: false
+burn_t: 0.5
+c_steps: 5
+cal: 20
+compute_residual: true
+fx: 1.5
+fy: 1.5
+gpu_id: '3'
+ksp_path: /home/ague/data/gluo/dataset/LI/LI, Dahui_T2S_1.npz
+last_iteration: 100
+last_step_factor: 15
+map_end: true
+model_folder: /home/ague/archive/projects/2021/gluo/mcmc_recon/models/net2/20211007-232921
+model_name: sde_brain_500
+nr_samples: 10
+poisson: true
+s_stepsize: 25
+sampling_rate: 0.2
+st: 30
+target_snr: 1
+workspace: /home/gluo/workspace/sampling_posterior/map_end
+disable_z: True

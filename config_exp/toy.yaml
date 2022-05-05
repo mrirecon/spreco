@@ -1,0 +1,22 @@
+model: 'TOY'
+
+batch_size: 2000
+input_shape: [2]
+lr: 0.01
+sigma_max: 10.
+sigma_min: 0.
+nr_levels: 10
+num_units: 200
+nonlinearity: 'softmax'
+
+right_bound: 8.
+left_bound: -8.
+view_factor: 1.5
+
+seed: 10
+train_steps: 1000
+save_interval: 100
+log_folder: /home/jason/logs
+
+nr_gpu: 1
+gpu_id: '2'

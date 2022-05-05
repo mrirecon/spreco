@@ -1,0 +1,14 @@
+burn_in: false
+burn_step: 6
+center: false
+epsilon: 2.0e-05
+gpu_id: '3'
+ksp_path: /home/ague/data/gluo/dataset/LI/LI, Dahui_T2S_11.npz
+lamb: 6
+model_folder: /home/ague/archive/projects/2021/gluo/mcmc_recon/models/net1/20210830-210110
+model_name: ncsn_brain_900
+n_steps_each: 50
+nr_samples: 10
+o: 0
+shift: 0
+workspace: /home/gluo/workspace/sampling_posterior/unfolding_exp
