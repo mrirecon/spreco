@@ -19,7 +19,7 @@ This package is to reproduce the results in this paper [(pdf)](http://arxiv.org/
 
 ## Quickstart with colab
 
-1. Sample the posterior $p(\mathbf{x}|\mathbf{y})$   [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/gitlab.gwdg.de/AG_Uecker/spreco/main/scripts/demo_recon.ipynb)
+1. Sample the posterior $p(\mathbf{x}|\mathbf{y})$   [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/xuyuluo/spreco/blob/main/scripts/demo_recon.ipynb)
 2. Train an image prior [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrirecon/bart-workshop/blob/master/ismrm2021/bart_tensorflow/bart_tf.ipynb)
 
 ## Usage
@@ -152,10 +152,3 @@ workspace: /home/gluo/workspace/sampling_posterior/more_noise_scales
 target_snr: 1
 gpu_id: '3'
 ```
-
-TODO
-
-1. [ ] Complete jupyter notebook for training
-2. [ ] Prepare training data
-
-pandoc --pdf-engine=xelatex --listings -H listing-setup.tex  readme.md -o readme.pdf
