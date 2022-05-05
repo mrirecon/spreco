@@ -1,0 +1,16 @@
+burn_in: true
+burn_t: 0.3
+c_steps: 5
+gpu_id: '3'
+ksp_path: /home/ague/data/gluo/dataset/LI/LI, Dahui_T2S_1.npz
+model_folder: /home/gluo/logs/20211007-232921
+model_name: sde_brain_500
+nr_samples: 10
+s_stepsize: 25
+sampling_rate: 0.1
+st: 30
+target_snr: 1
+workspace: /home/gluo/workspace/sampling_posterior/burn-in
+poisson: false
+cal: 20
+disable_z: True

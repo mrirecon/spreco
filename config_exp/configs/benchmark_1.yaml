@@ -1,0 +1,16 @@
+burn_in: false
+burn_t: 0.7
+c_steps: 3
+gpu_id: '3'
+model_folder: /home/gluo/logs/20211006-232740
+model_name: sde_brain_900
+nr_samples: 10
+s_stepsize: 20
+st: 10
+target_snr: 1
+poisson: false
+fx: 1.6
+fy: 1.6
+calr: 20
+ksp_rate: 0.12
+disable_z: True
