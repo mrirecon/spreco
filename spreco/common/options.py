@@ -25,12 +25,14 @@ class MODELS():
     """
     NCSN         = 'NCSN'
     SDE          = 'SDE'
+    PIXELCNN     = 'PIXELCNN'
     
     @staticmethod
     def get():
         return [
             MODELS.NCSN,
-            MODELS.SDE
+            MODELS.SDE,
+            MODELS.PIXELCNN
         ]
 
 

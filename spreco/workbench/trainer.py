@@ -1,16 +1,12 @@
-import os
-import sys
-PACKAGE_PARENT = '..'
-SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
-sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
+from spreco.common.options import MODELS
+from spreco.common import utils
+from spreco.common.logger import logger
 
-from common.options import MODELS
-from common import utils
-from common.logger import logger
 
 import tensorflow.compat.v1 as tf
 tf.disable_eager_execution()
 
+import os
 import numpy as np
 import time
 
@@ -43,10 +39,13 @@ class trainer():
         
         if self.config['model'] == MODELS.NCSN:
             tf.random.set_random_seed(self.config['seed'])
-            from model.ncsn import ncsn as selected_class
+            from spreco.model.ncsn import ncsn as selected_class
 
         elif self.config['model'] == MODELS.SDE:
-            from model.sde import sde as selected_class
+            from spreco.model.sde import sde as selected_class
+        
+        elif self.config['model'] == MODELS.PIXELCNN:
+            from spreco.model.pixelcnn import pixelcnn as selected_class
 
         else:
             raise Exception("Currently, this model is not implemented!")

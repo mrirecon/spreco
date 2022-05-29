@@ -41,6 +41,12 @@ def right_shift(x):
     xs = int_shape(x)
     return tf.concat([tf.zeros([xs[0],xs[1],1,xs[3]]), x[:,:,:xs[2]-1,:]],2)
 
+def concat_elu(x):
+    """
+    like concatenated ReLU (http://arxiv.org/abs/1603.05201), but then with ELU
+    """
+    axis = len(x.get_shape())-1
+    return tf.nn.elu(tf.concat([x, -x], axis))
 
 def get_nonlinearity(strs):
 

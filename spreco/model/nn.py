@@ -158,6 +158,56 @@ def conv2d_plus(x_, num_filters, filter_size=[3,3], stride=[1,1], pad='SAME', no
 
         return x
 
+@add_arg_scope
+def conv2d(x_, num_filters, filter_size=[3,3], stride=[1,1], pad='SAME', nonlinearity=None, init_scale=1., counters={}, init=False, ema=None, bias=True, **kwargs):
+    ''' convolutional layer '''
+    if 'scope' in kwargs.keys():
+        name = get_name(kwargs['scope'], counters) # this is the scope defined by args
+    else:
+        name = get_name('conv2d', counters) # this is default scope named with conv2d
+    
+    if 'debug' in kwargs.keys():
+        if kwargs['debug']:
+            print(name)
+    stop_grad = False 
+    if 'stop_grad' in kwargs.keys():
+        stop_grad = kwargs['stop_grad']
+
+    dilation = 1
+    if 'dilation' in kwargs.keys():
+        dilation = kwargs['dilation']
+
+    with tf.variable_scope(name):
+        V = get_variable('V', stop_grad, shape=filter_size+[int(x_.get_shape()[-1]),num_filters], dtype=tf.float32,
+                              initializer=tf.random_normal_initializer(0, 0.05), trainable=True)
+        g = get_variable('g', stop_grad, shape=[num_filters], dtype=tf.float32,
+                              initializer=tf.constant_initializer(1.), trainable=True)
+        b = get_variable('b', stop_grad, shape=[num_filters], dtype=tf.float32,
+                              initializer=tf.constant_initializer(0.), trainable=True)
+
+        # use weight normalization (Salimans & Kingma, 2016)
+        W = tf.reshape(g, [1, 1, 1, num_filters]) * tf.nn.l2_normalize(V, [0, 1, 2])
+        
+        # calculate convolutional layer output
+        x = tf.nn.conv2d(x_, W, [1] + stride + [1], pad, dilations=dilation)
+        if bias:
+            x = tf.nn.bias_add(x, b)
+
+        if init:  # normalize x
+            m_init, v_init = tf.nn.moments(x, [0,1,2])
+            scale_init = init_scale / tf.sqrt(v_init + 1e-10)
+            with tf.control_dependencies([g.assign(g * scale_init), b.assign_add(-m_init * scale_init)]):
+                # x = tf.identity(x)
+                W = tf.reshape(g, [1, 1, 1, num_filters]) * tf.nn.l2_normalize(V, [0, 1, 2])
+                x = tf.nn.conv2d(x_, W, [1] + stride + [1], pad, dilations=dilation)
+                if bias:
+                    x = tf.nn.bias_add(x, b)
+
+        # apply nonlinearity
+        if nonlinearity is not None:
+            x = nonlinearity(x)
+
+        return x
 
 @add_arg_scope
 def deconv2d(x_, num_filters, filter_size=[3,3], stride=[1,1], pad='SAME', nonlinearity=None, init_scale=1., counters={}, init=False, ema=None, bias = True, **kwargs):
@@ -483,3 +533,61 @@ def layer_norm(x, counters={}, **kwargs):
         mean, variance = tf.nn.moments(x, [1,2,3], keepdims=True)
         out = tf.nn.batch_normalization(x, mean, variance, offset=beta, scale=gamma, variance_epsilon=1e-12, name='layer_norm')
         return out
+
+
+##### PIXELCNN++ #####
+@add_arg_scope
+def gated_resnet(x, a=None, h=None, nonlinearity=concat_elu, conv=conv2d, init=False, counters={}, ema=None, dropout_p=0., **kwargs):
+    xs = int_shape(x)
+    num_filters = xs[-1]
+    
+    c1 = conv(nonlinearity(x), num_filters)
+    if a is not None: # add short-cut connection if auxiliary input 'a' is given
+        c1 += nin(nonlinearity(a), num_filters)
+    c1 = nonlinearity(c1)
+    if dropout_p > 0:
+        c1 = tf.nn.dropout(c1, keep_prob=1. - dropout_p)
+    
+    c2 = conv(c1, num_filters * 2, init_scale=0.1)
+
+    # add projection of h vector if included: conditional generation
+    stop_grad = False 
+    if 'stop_grad' in kwargs.keys():
+        stop_grad = kwargs['stop_grad']
+
+    if h is not None:
+        with tf.variable_scope(get_name('conditional_weights', counters)):
+            hw = get_variable('hw', stop_grad, ema, shape=[int_shape(h)[-1], 2 * num_filters], dtype=tf.float32,
+                                    initializer=tf.random_normal_initializer(0, 0.05), trainable=True)
+        if init:
+            hw = hw.initialized_value()
+        c2 += tf.reshape(tf.matmul(h, hw), [xs[0], 1, 1, 2 * num_filters])
+    
+
+    a, b = tf.split(c2, 2, 3)
+    c3 = a * tf.nn.sigmoid(b)
+    
+    return x + c3
+
+
+@add_arg_scope
+def down_shifted_conv2d(x, num_filters, filter_size=[2,3], stride=[1,1], **kwargs):
+    x = tf.pad(x, [[0,0],[filter_size[0]-1,0], [int((filter_size[1]-1)/2),int((filter_size[1]-1)/2)],[0,0]])
+    return conv2d(x, num_filters, filter_size=filter_size, pad='VALID', stride=stride, **kwargs)
+
+@add_arg_scope
+def down_shifted_deconv2d(x, num_filters, filter_size=[2,3], stride=[1,1], **kwargs):
+    x = deconv2d(x, num_filters, filter_size=filter_size, pad='VALID', stride=stride, **kwargs)
+    xs = int_shape(x)
+    return x[:,:(xs[1]-filter_size[0]+1),int((filter_size[1]-1)/2):(xs[2]-int((filter_size[1]-1)/2)),:]
+
+@add_arg_scope
+def down_right_shifted_conv2d(x, num_filters, filter_size=[2,2], stride=[1,1], **kwargs):
+    x = tf.pad(x, [[0,0],[filter_size[0]-1, 0], [filter_size[1]-1, 0],[0,0]])
+    return conv2d(x, num_filters, filter_size=filter_size, pad='VALID', stride=stride, **kwargs)
+
+@add_arg_scope
+def down_right_shifted_deconv2d(x, num_filters, filter_size=[2,2], stride=[1,1], **kwargs):
+    x = deconv2d(x, num_filters, filter_size=filter_size, pad='VALID', stride=stride, **kwargs)
+    xs = int_shape(x)
+    return x[:,:(xs[1]-filter_size[0]+1):,:(xs[2]-filter_size[1]+1),:]
