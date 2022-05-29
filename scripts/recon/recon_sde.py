@@ -18,7 +18,13 @@ def main(config_path):
 
     def prepare_simu(config, mask=None):
         
-        kspace = np.squeeze(np.load(config['ksp_path'])['kspace'])
+        name, ext = os.path.splitext(config['ksp_path'])
+        if ext == '.npz':
+            kspace = np.squeeze(np.load(config['ksp_path'])['kspace'])
+        elif ext == '.cfl':
+            kspace = np.squeeze(utils.readcfl(name))
+        else:
+            raise TypeError('File type is not supported!')
 
         nx, ny, _ = kspace.shape
         coilsen = np.squeeze(utils.bart(1, 'ecalib -m1 -r20 -c0.001', kspace[np.newaxis, ...]))
@@ -81,7 +87,15 @@ def main(config_path):
         image           = np.array(image)
 
     log_path = utils.create_folder(config['workspace'])
-    utils.writecfl(log_path+'/image', utils.float2cplx(image))
+    if 'save_intermediate' not in config.keys():
+        utils.writecfl(log_path+'/image', utils.float2cplx(image)[-1])
+    else:
+        if config['save_intermediate']:
+            utils.writecfl(log_path+'/image', utils.float2cplx(image))
+        else:
+            utils.writecfl(log_path+'/image', utils.float2cplx(image)[-1])
+
+
     utils.writecfl(log_path+'/rss', rss)
     utils.writecfl(log_path+'/zero_filled', zero_filled)
     utils.writecfl(log_path+'/mask', mask)
