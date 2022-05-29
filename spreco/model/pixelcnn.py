@@ -110,7 +110,15 @@ class pixelcnn():
             self.loss_train  = loss[0]/(np.log(2.0)*np.prod(self.config['input_shape'])*self.config['batch_size']*self.config['nr_gpu'])
             self.loss_test   = loss_test[0]/(np.log(2.0)*np.prod(self.config['input_shape'])*self.config['batch_size']*self.config['nr_gpu'])
         else:
-            pass
+            self.init_inference(1)
+            init_pass = self.forward(self.x, init=True, dropout_p=0., **model_opt) 
+            self.out = self.forward(self.x, dropout_p=0., **model_opt)
+
+            loss = loss_func(self.x, self.out)
+            self.loss = loss/(np.log(2.0)*np.prod(self.config['input_shape'])*1)
+
+            self.grads = tf.squeeze(tf.gradients(self.loss, self.x), name='grad_0')
+
 
     @staticmethod
     def body(x, h=None, init=False, ema=None, layer_norm=False, dropout_p=0.5, nr_resnet=3, nr_filters=160, nr_logistic_mix=10, resnet_nonlinearity='concat_elu', data_chns=DATA_CHNS.CPLX, rlt=1):
