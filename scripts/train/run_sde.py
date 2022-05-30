@@ -7,12 +7,12 @@ import os
 
 def main(args):
 
+    if os.path.exists(args.config):
+        config = utils.load_config(args.config)
+    else:
+        raise Exception('The specified config.yaml is not existed, please check!')
+
     if args.train:
-        ## preparation
-        if os.path.exists(args.config):
-            config = utils.load_config(args.config)
-        else:
-            raise Exception('The specified config.yaml is not existed, please check!')
 
         train_files = utils.find_files(config['train_data_path'], config['pattern'])
         test_files  = utils.find_files(config['test_data_path'], config['pattern'])
@@ -37,17 +37,17 @@ def main(args):
         utils.color_print('TRAINING FINISHED')
 
     else:
-        utils.color_print('You select neither training nor exporting the model!!!')
-        utils.color_print("To see help info python run_pixelcnn.py -h")
+        go = trainer(None, None, config)
+        go.export(args.model_path, args.save_folder, config['saved_name'])
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--train', default=True, action='store_true', help='select train')
-    parser.add_argument('-i', '--inference', default=False, action='store_true', help='select inference')
-    parser.add_argument('--config', type=str, default='/home/gluo/spreco/config_exp/sde_refinenet.yaml')
-    parser.add_argument('-l', '--logdir', metavar='', type=str, default='/scratch/gluo/20210707-095003', help='please give logdir at the inference stage,')
-    parser.add_argument('-e', '--s_epoch', metavar='', type=int, default=50, help='select epoch at the inference stage')
+    parser.add_argument('-c', '--config', type=str, default='/home/gluo/spreco/config_exp/sde_refinenet.yaml')
+    parser.add_argument('-t', '--train', default=False, action='store_true', help='select train')
+    parser.add_argument('-e', '--export', default=False, action='store_true', help='select export')
+    parser.add_argument('-m', '--model_path', type=str, default='None', help='the path of model to be exported')
+    parser.add_argument('-s', '--save_folder', type=str, default='None', help='folder for saving the exported model')
 
     args = parser.parse_args()
     main(args)

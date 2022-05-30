@@ -156,11 +156,27 @@ class trainer():
         if self.test_pipe is not None:
             self.test_pipe.stop()
 
+    def restore(self, model_path):
+        """
+        TODO: how to reuse the codes in function prep
+        """
+        print("Restoring model")
+        saver = tf.train.Saver()
+        gpu_options = tf.GPUOptions(allow_growth=True, visible_device_list='0')
+        config_proto = tf.ConfigProto(gpu_options=gpu_options)
+        config_proto.gpu_options.allow_growth=True
+        serialized = config_proto.SerializeToString()
+        gpu_id = list(map(hex, serialized))
+        sess = tf.Session(config=config_proto)
+        sess.run(tf.global_variables_initializer())
+        saver.restore(sess, model_path)
+        return saver, sess, gpu_id
+
     def export(self, model_path, export_path, name):
         
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
         os.environ["CUDA_VISIBLE_DEVICES"] = self.config['gpu_id']
 
         self.get_model(export=True)
-        saver, sess, gpu_id = self.model.restore(model_path)
+        saver, sess, gpu_id = self.restore(model_path)
         utils.export_model(saver, sess, export_path, name, gpu_id=gpu_id)
