@@ -36,7 +36,7 @@ def main(args):
         utils.log_to(os.path.join(go.log_path, 'config.yaml'), [utils.get_timestamp(), "The training is ending"], prefix="#")
         utils.color_print('TRAINING FINISHED')
 
-    else:
+    if args.export:
         go = trainer(None, None, config)
         go.export(args.model_path, args.save_folder, config['saved_name'])
 
