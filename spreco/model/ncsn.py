@@ -104,4 +104,5 @@ class ncsn():
             self.loss_test = loss_test[0]/self.config['nr_gpu']
 
         else:
-            pass
+            _ = self.anneal_denoise_score_matching(self.inputs[0], self.h[0])
+            all_params = tf.trainable_variables()

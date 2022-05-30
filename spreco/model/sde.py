@@ -171,7 +171,8 @@ class sde():
             self.loss_train = loss[0]/self.config['nr_gpu']
             self.loss_test  = loss_test[0]/self.config['nr_gpu']
         else:
-            pass
+            _          = self.loss(self.x[0], self.t[0])
+            all_params = tf.trainable_variables()
 
 
 class posterior_sampler():
