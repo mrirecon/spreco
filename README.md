@@ -1,4 +1,4 @@
-# MRI <span style="color:red">RECO</span>nstruction by <span style="color:red">S</span>ampling <span style="color:red">P</span>osterior (SPRECO)
+# MRI Reconstruction via Data Driven Markov Chain with Joint Uncertainty Estimation (SPRECO)
 
 This package is to reproduce the results in [Luo, et al (2022)](http://arxiv.org/abs/2202.01479). All programs are tested on Debian. There are two ways to set up the environment and please use python 3.8.
 
