@@ -20,7 +20,14 @@ def main(config_path):
 
     def prepare_simu(config):
 
-        kspace    = np.squeeze(np.load(config['ksp_path'])['kspace'])
+        name, ext = os.path.splitext(config['ksp_path'])
+        if ext == '.npz':
+            kspace = np.squeeze(np.load(config['ksp_path'])['kspace'])
+        elif ext == '.cfl':
+            kspace = np.squeeze(utils.readcfl(name))
+        else:
+            raise TypeError('File type is not supported!')
+
         nx, ny, _ = kspace.shape
 
         coilsen   = np.squeeze(utils.bart(1, 'ecalib -m1 -r20 -c0.001', kspace[np.newaxis, ...]))
@@ -35,11 +42,13 @@ def main(config_path):
         coilsen = np.squeeze(coilsen)
         x_ = ops.AT_cart(und_ksp, coilsen, mask, [nx, ny])
 
-        return x_, mask, coilsen, (nx, ny), rss
+        l1_recon = utils.bart(1, 'pics -l1 -r 0.01', und_ksp[:,:, np.newaxis, :], coilsen[:, :, np.newaxis, :])
+
+        return x_, mask, coilsen, (nx, ny), rss, l1_recon, und_ksp
 
 
     ins_pixelcnn = pixelcnn(model_config)
-    ins_pixelcnn.prep(True)
+    ins_pixelcnn.prep(True, batch_size=1)
     saver   = tf.train.Saver()
     sess    = tf.Session()
     sess.run(tf.global_variables_initializer())
@@ -67,8 +76,28 @@ def main(config_path):
             images.append(img_k)
         return images
 
+    def pocsense_with_prior(zero_filled, und_ksp, coilsen, mask, lamb, iterations):
 
-    zero_filled, mask, coilsen, shape, rss = prepare_simu(config)
+        scalar      = np.max(abs(zero_filled))
+        zero_filled = utils.cplx2float(zero_filled/scalar)
+        img_k       = zero_filled
+        und_ksp = und_ksp/scalar
+        images=[img_k]
+        for itr in tqdm.tqdm(range(iterations)):
+            grads = logp_grads(img_k)
+            select = np.random.choice(2, zero_filled.shape, p=[config['dropout'],1 - config['dropout']])
+            img_k = img_k - select*grads*lamb
+            
+            #maximum = np.max(abs(utils.float2cplx(img_k)))
+
+            iterkspace = ops.A_cart(utils.float2cplx(img_k), coilsen[np.newaxis, ...], 1-mask[np.newaxis, ...], shape, axis=(1,2))
+            img_k = utils.cplx2float(ops.AT_cart(und_ksp+iterkspace, coilsen[np.newaxis, ...], np.ones_like(mask[np.newaxis, ...]), shape, axis=(1,2)))
+
+#            zero_filled = zero_filled / maximum
+            images.append(img_k)
+        return images
+
+    zero_filled, mask, coilsen, shape, rss, l1_recon, und_ksp = prepare_simu(config)
 
     params = {'coilsen': coilsen,
              'mask': mask,
@@ -76,15 +105,19 @@ def main(config_path):
              'iterations': config['iterations'],
     }
 
-    images = sense_with_prior(np.squeeze(zero_filled)[np.newaxis, ...], **params)
+    #images = sense_with_prior(np.squeeze(zero_filled)[np.newaxis, ...], **params)
+ 
+    images_pocsense = pocsense_with_prior(np.squeeze(zero_filled)[np.newaxis, ...], und_ksp[np.newaxis, ...], **params)
 
     log_path = utils.create_folder(config['workspace'])
-    images_cplx = utils.float2cplx(np.array(images))
+    #images_cplx = utils.float2cplx(np.array(images))
+    images_cplx = utils.float2cplx(np.array(images_pocsense))
 
     utils.writecfl(log_path+'/rss', rss)
     utils.writecfl(log_path+'/image', images_cplx)
     utils.writecfl(log_path+'/mask', mask)
     utils.writecfl(log_path+'/zero_filled', zero_filled)
+    utils.writecfl(log_path+'/l1_recon', l1_recon)
     utils.save_config(config, log_path)
 
 if __name__ == "__main__":
