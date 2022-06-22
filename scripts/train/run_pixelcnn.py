@@ -26,7 +26,7 @@ def main(args):
             return utils.normalize_with_max(x)
 
         def slice_image(x):
-            return utils.slice_image(x, [256, 256, 2])
+            return utils.slice_image(x, config['input_shape'])
 
         parts_funcs = [[npz_loader, squeeze, normalize, slice_image]]
 
