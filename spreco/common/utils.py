@@ -33,7 +33,7 @@ def log_to(file, vars, mode="a", clear=False, end='\n', prefix=None):
                         print(prefix, end='')
                     print(var, end=end)
 
-def save_img(img, path, vmin=0., vmax=1., cmap='gray'):
+def save_img(img, path, vmin=0., vmax=1., cmap='gray', interpolation=None):
     """
     print images to pdf and png without white margin
 
@@ -41,7 +41,7 @@ def save_img(img, path, vmin=0., vmax=1., cmap='gray'):
     img: image arrays
     path: saving path
     """
-    plt.imshow(img, cmap=cmap, interpolation='none', vmin=vmin, vmax=vmax)
+    plt.imshow(img, cmap=cmap, interpolation=interpolation, vmin=vmin, vmax=vmax)
     plt.axis('off')
     plt.savefig(path, bbox_inches='tight', pad_inches = 0)
     plt.savefig(path+'.pdf', bbox_inches='tight', pad_inches = 0)
