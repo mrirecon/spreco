@@ -1,5 +1,5 @@
 model: 'NCSN'
-batch_size: 4
+batch_size: 2
 input_shape: [256, 256, 2]
 data_chns: 'CPLX'
 lr: 0.0001
@@ -16,15 +16,14 @@ max_keep: 100
 max_epochs: 1000
 save_interval: 50
 saved_name: ncsn_brain
-log_folder: xxxx
-
-train_data_path: xxxx
-test_data_path: xxxx
-pattern: "hku_*.npz"
-num_prepare: 10
+log_folder: /content/logs
 print_loss: True
-parts: 
-    - [{func: 'npz_loader', key: 'rss'}, {func: 'squeeze'}, {func: 'normalize_with_max'}, {func: 'slice_image', shape: [256, 256, 2]}]
-    - [{func: 'randint', nr_levels: 10}]
-nr_gpu: 2
-gpu_id: '1,2'
+
+train_data_path: /content/spreco/data/brain_mnist/train
+test_data_path: /content/spreco/data/brain_mnist/test
+pattern: "*.npz"
+num_prepare: 10
+
+
+nr_gpu: 1
+gpu_id: '0'
