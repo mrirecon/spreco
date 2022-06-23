@@ -67,7 +67,4 @@ This is the [explanation](#explanation-of-the-config-file-for-reconstruction) fo
    5. Investigate into burn-in phase
    6. Distortion</p>
 
-Start all experiments from the terminal
-```shell
-$ bash scripts/recon/run_expr.sh
-```
+We suggest you to go over the configuration files and check all the paths for trained model, k-space and workspace to save results before starting each experiment in `run_expr.sh`.
