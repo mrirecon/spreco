@@ -19,8 +19,8 @@ This package is to reproduce the results in [Luo, et al (2022)](http://arxiv.org
 
 ## Quickstart with colab
 
-1. Sample the posterior [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/xuyuluo/spreco/blob/main/scripts/demo_recon.ipynb)
-2. Train an image prior [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/xuyuluo/spreco/blob/main/scripts/demo_train.ipynb)
+1. Sample the posterior [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrirecon/spreco/blob/main/scripts/demo_recon.ipynb)
+2. Train an image prior [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrirecon/spreco/blob/main/scripts/demo_train.ipynb)
 
 ## Usage
 Be careful with the files' location such as config files, training files and so on.
