@@ -1,6 +1,8 @@
 from spreco.model.refine_net_sde import cond_refine_net_plus
+from spreco.model.pixelcnn import pixelcnn
 from spreco.common.custom_adam import AdamOptimizer
-from spreco.common import utils
+from spreco.common import utils, ops
+
 
 import tqdm
 import tensorflow.compat.v1 as tf
@@ -177,7 +179,7 @@ class sde():
 
 class posterior_sampler():
 
-    def __init__(self, sde, steps, target_snr, nr_samples, burn_in, burn_t, map_end=False, last_iteration=100, last_step_factor=1, disable_z=False):
+    def __init__(self, sde, steps, target_snr, nr_samples, burn_in, burn_t, map_end=False, last_iteration=100, last_step_factor=1, disable_z=False, use_pixelcnn=False, pixelcnn_reg=None):
         self.sde        = sde
         self.steps      = steps
         self.target_snr = target_snr
@@ -186,10 +188,34 @@ class posterior_sampler():
         self.burn_t     = burn_t
         self.burn_flag  = True
         self.map_end    = map_end
-        self.last_iteration = last_iteration
+        self.last_iteration   = last_iteration
         self.last_step_factor = last_step_factor
         self.disable_z        = disable_z
+        self.use_pixelcnn     = use_pixelcnn
+        self.pixelcnn_reg     = pixelcnn_reg
+        self.mask = None
+        self.coilsen = None
+        self.shape = None
+        self.und_ksp = None
 
+    def get_grad_logp_p(self, pixelcnn_config, pixelcnn_path):
+
+        tf.reset_default_graph()
+
+        ins_pixelcnn = pixelcnn(pixelcnn_config)
+        ins_pixelcnn.prep(True, batch_size=self.nr_samples)
+
+        saver     = tf.train.Saver()
+        tf_config = tf.ConfigProto()
+        tf_config.gpu_options.allow_growth=True
+        sess    = tf.Session(config=tf_config)
+        sess.run(tf.global_variables_initializer())
+        saver.restore(sess, pixelcnn_path)
+
+        def grad_logp_p(x):
+            return sess.run(ins_pixelcnn.grads, {ins_pixelcnn.x: x})
+
+        self.grad_logp_p = grad_logp_p
 
     def conditional_ancestral_sampler(self, x, t, sess, AHA, AHy, s_stepsize, st=100):
       
@@ -231,6 +257,8 @@ class posterior_sampler():
         get_noise_op_1 = get_noise_1(x, t)
         get_noise_op_2 = get_noise_2(x, t)
 
+        if self.use_pixelcnn:
+            self.get_grad_logp_p(self.pixelcnn_reg['pixelcnn_config'], self.pixelcnn_reg['pixelcnn_path'])
 
         x_val     = np.random.rand(*(utils.cplx2float(AHy).shape))
         t_vals    = np.linspace(self.sde.T, self.sde.eps, self.sde.N)
@@ -274,6 +302,17 @@ class posterior_sampler():
                 grad_data_fidelity = utils.cplx2float(grad_data_fidelity)
 
                 x_val = x_val + tau*score - std*s_stepsize*grad_data_fidelity + s_stepsize*std*noisy_x + noise
+
+                if self.use_pixelcnn:
+                    scale = np.max(abs(utils.float2cplx(x_val)))
+                    print(scale)
+                    x_val = x_val/scale
+                    select = np.random.choice(2, x_val.shape, p=[self.pixelcnn_reg['dropout'], 1 - self.pixelcnn_reg['dropout']])
+                    grads = self.grad_logp_p(x_val)
+                    x_val = x_val - select*grads*self.pixelcnn_reg['lamb']
+                    iterkspace = ops.A_cart(utils.float2cplx(x_val), self.coilsen[np.newaxis, ...], 1-self.mask[np.newaxis, ...], self.shape, axis=(1,2))
+                    x_val = utils.cplx2float(ops.AT_cart(self.und_ksp+iterkspace, self.coilsen[np.newaxis, ...], np.ones_like(self.mask[np.newaxis, ...]), self.shape, axis=(1,2)))
+                    x_val = x_val*scale
 
                 xs.append(x_val)
 

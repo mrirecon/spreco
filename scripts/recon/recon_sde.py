@@ -46,11 +46,13 @@ def main(config_path):
         coilsen = np.squeeze(coilsen)
         x_ = ops.AT_cart(und_ksp, coilsen, mask, img_shape)
 
-        return x_, mask, coilsen, (nx, ny), rss
+        return x_, mask, coilsen, (nx, ny), rss, und_ksp
 
     ## data consistency
-    zero_filled, mask, coilsen, shape, rss = prepare_simu(config)
-    zero_filled = utils.float2cplx(utils.normalize_with_max(zero_filled)) # [-1, 1]
+    zero_filled, mask, coilsen, shape, rss, und_ksp = prepare_simu(config)
+    maxi = np.max(np.abs(zero_filled))
+    zero_filled = zero_filled/maxi
+    und_ksp = und_ksp/maxi
 
     grad_params = {'coilsen': coilsen[np.newaxis, ...], 'mask': mask[np.newaxis, ...], 'shape': shape, 'center': False}
     AHA         = partial(ops.AHA, **grad_params)
@@ -67,16 +69,38 @@ def main(config_path):
     sess.run(tf.global_variables_initializer())
     saver.restore(sess, os.path.join(config['model_folder'], config['model_name']))
 
+    if 'use_pixelcnn' in config.keys():
+        if config['use_pixelcnn']:
+            pixelcnn_config = utils.load_config(config['pixelcnn_config'])
+            pixelcnn_path   = config['pixelcnn_path']
+            pixelcnn_reg    = {}
+            pixelcnn_reg['pixelcnn_path']   = pixelcnn_path
+            pixelcnn_reg['pixelcnn_config'] = pixelcnn_config
+            pixelcnn_reg['dropout']         = config['dropout']
+            pixelcnn_reg['lamb']            = config['pixelcnn_lamb']
+        else:
+            pixelcnn_reg=None
+    else:
+        pixelcnn_reg=None
+
+
     ins_sampler     = posterior_sampler(ins_sde, 
-                              steps=config['c_steps'],
-                              target_snr=config['target_snr'],
+                              steps      = config['c_steps'],
+                              target_snr = config['target_snr'],
                               nr_samples = config['nr_samples'],
-                              burn_in=config['burn_in'],
-                              burn_t=config['burn_t'],
-                              map_end = False if 'map_end' not in config.keys() else config['map_end'],
-                              last_iteration = 5 if 'last_iteration' not in config.keys() else config['last_iteration'], 
-                              last_step_factor= 1 if 'last_step_factor' not in config.keys() else config['last_step_factor'],
-                              disable_z = False if 'disable_z' not in config.keys() else config['disable_z'])
+                              burn_in    = config['burn_in'],
+                              burn_t     = config['burn_t'],
+                              map_end    = False if 'map_end' not in config.keys() else config['map_end'],
+                              last_iteration   = 5 if 'last_iteration' not in config.keys() else config['last_iteration'], 
+                              last_step_factor = 1 if 'last_step_factor' not in config.keys() else config['last_step_factor'],
+                              disable_z        = False if 'disable_z' not in config.keys() else config['disable_z'],
+                              use_pixelcnn     = False if 'use_pixelcnn' not in config.keys() else config['use_pixelcnn'],
+                              pixelcnn_reg=pixelcnn_reg)
+
+    ins_sampler.mask = mask
+    ins_sampler.coilsen = coilsen
+    ins_sampler.shape = shape
+    ins_sampler.und_ksp = und_ksp
 
     image = ins_sampler.conditional_ancestral_sampler(x, t, sess, AHA, zero_filled[np.newaxis, ...], config['s_stepsize'], st=config['st'])
 
@@ -90,10 +114,9 @@ def main(config_path):
     if 'save_intermediate' not in config.keys():
         utils.writecfl(log_path+'/image', utils.float2cplx(image)[-1])
     else:
+        utils.writecfl(log_path+'/image', utils.float2cplx(image)[-1])
         if config['save_intermediate']:
-            utils.writecfl(log_path+'/image', utils.float2cplx(image))
-        else:
-            utils.writecfl(log_path+'/image', utils.float2cplx(image)[-1])
+            utils.writecfl(log_path+'/iter', utils.float2cplx(image))
 
 
     utils.writecfl(log_path+'/rss', rss)

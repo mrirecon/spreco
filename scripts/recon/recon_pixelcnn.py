@@ -53,12 +53,13 @@ def main(config_path):
     sess    = tf.Session()
     sess.run(tf.global_variables_initializer())
     saver.restore(sess, model_path)
+    tf.random.set_random_seed(1234)
 
     def logp_grads(x):
         return sess.run(ins_pixelcnn.grads, {ins_pixelcnn.x: x})
 
     def sense_with_prior(zero_filled, coilsen, mask, lamb, iterations):
-
+        np.random.seed(1234)
         scalar      = np.max(abs(zero_filled))
         zero_filled = utils.cplx2float(zero_filled/scalar)
         img_k       = zero_filled
@@ -105,13 +106,13 @@ def main(config_path):
              'iterations': config['iterations'],
     }
 
-    #images = sense_with_prior(np.squeeze(zero_filled)[np.newaxis, ...], **params)
+    images = sense_with_prior(np.squeeze(zero_filled)[np.newaxis, ...], **params)
  
-    images_pocsense = pocsense_with_prior(np.squeeze(zero_filled)[np.newaxis, ...], und_ksp[np.newaxis, ...], **params)
+    #images = pocsense_with_prior(np.squeeze(zero_filled)[np.newaxis, ...], und_ksp[np.newaxis, ...], **params)
 
     log_path = utils.create_folder(config['workspace'])
     #images_cplx = utils.float2cplx(np.array(images))
-    images_cplx = utils.float2cplx(np.array(images_pocsense))
+    images_cplx = utils.float2cplx(np.array(images))
 
     utils.writecfl(log_path+'/rss', rss)
     utils.writecfl(log_path+'/image', images_cplx)
@@ -122,6 +123,6 @@ def main(config_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('--config', metavar='path', default='/home/gluo/github/spreco/scripts/recon_pixelcnn.yaml', help='path of config file')
+    parser.add_argument('--config', metavar='path', default='/home/gluo/github/spreco/config_exp/configs/recon_pixelcnn.yaml', help='path of config file')
     args = parser.parse_args()
     main(args.config)

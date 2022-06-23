@@ -87,6 +87,11 @@ def main(config_path):
                 noise = np.random.randn(*x_mod.shape) * std
                 x_mod = x_mod + psnr*tau*score - std*lamb*grad_data_fidelity + lamb*std*noise_x_ + noise
                 
+                if False:
+                    noise = np.random.randn(*x_mod.shape) * std
+                    x_mod = x_mod + psnr*tau*score + noise
+                    iterkspace = ops.A_cart(utils.float2cplx(x_mod), coilsen[np.newaxis, ...], 1-mask[np.newaxis, ...], shape, axis=(1,2))
+                    x_mod = utils.cplx2float(ops.AT_cart(und_ksp+iterkspace, coilsen[np.newaxis, ...], np.ones_like(mask[np.newaxis, ...]), shape, axis=(1,2)))
 
                 images.append(x_mod)
         return images
