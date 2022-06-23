@@ -1,6 +1,8 @@
 set -e
 
 export TF_CPP_MIN_LOG_LEVEL=3
+
+#### you may need to specify root_path for your system
 root_path=/home/gluo/spreco
 
 ## unfolding
