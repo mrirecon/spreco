@@ -35,16 +35,11 @@ Explanation for files in the folder `scripts`
 1. `run_expr.sh` is the script to perform all experiments.
 1. `recon_config.yaml` is the reconstruction config file for `demo_recon.ipynb`.
 
-Remember to activate your environment if you're using conda. Please clone this repository before training and inferencing.
-
-```shell
-$ git clone https://github.com/mrirecon/spreco.git
-$ cd spreco
-```
+Remember to activate your environment if you're using conda. 
 
 ### 1. Train priors
 
-This is [explanation](#explanation-of-the-config-file-for-training) for the training configuration file. Start the trainer from the terminal
+Start the trainer from the terminal
 
    ```shell
    $ python scripts/train/run_ncsn.py --train --config=config_exp/ncsn.yaml
@@ -58,7 +53,7 @@ After the training started, use tensorboard to track the training loss.
 
 ### 2. Apply priors to MRI image reconstruction
 
-This is the [explanation](#explanation-of-the-config-file-for-reconstruction) for the reconstruction configuration file. All experiments are listed below.
+All experiments are listed below.
 
    1. Single coil unfolding
    2. Multi-coil reconstruction
