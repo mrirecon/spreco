@@ -67,4 +67,13 @@ This is the [explanation](#explanation-of-the-config-file-for-reconstruction) fo
    5. Investigate into burn-in phase
    6. Distortion</p>
 
-We suggest you to go over the configuration files and check all the paths for trained model, k-space and workspace to save results before starting each experiment in `run_expr.sh`.
+We suggest you to go over the configuration files and check all the paths for trained model, k-space and workspace to save results before starting each experiment in `run_expr.sh`. You can get all the trained models on this [page](https://zenodo.org/record/6521188) hosted by zenodo.
+
+To run `benchmark.sh`, you may need to run `prepare.py` first to generate retrospective undersampled k-space data.
+
+## Infos about the files on [zenodo](https://zenodo.org/record/6521188)
+
+1. `brain_mnist.tar` is a tiny dataset for the training demo.
+1. `full_kspace.npz` is fully sampled k-space data for the reconstruction demo.
+1. `models.tar` contains the trained models of $\mathtt{NET}_1,\mathtt{NET}_2,\mathtt{NET}_3$.
+1. `pre-trained.tar` contains one trained model for the reconstruction demo.
