@@ -15,7 +15,7 @@ target_snr: 1
 ksp_path: ./spreco/data/full_kspace.npz
 model_folder: ./spreco/data/pre-trained
 model_name: brain_model
-gpu_id: '3'
+gpu_id: '0'
 
 
 
