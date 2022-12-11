@@ -7,6 +7,7 @@ from spreco.common import utils, ops
 import tqdm
 import tensorflow.compat.v1 as tf
 import numpy as np
+import cupy as cp
 
 class sde():
     """
@@ -179,17 +180,16 @@ class sde():
 
 class posterior_sampler():
 
-    def __init__(self, sde, steps, target_snr, nr_samples, burn_in, burn_t, map_end=False, last_iteration=100, last_step_factor=1, disable_z=False, use_pixelcnn=False, pixelcnn_reg=None):
+    def __init__(self, sde, steps, target_snr, nr_samples, burn_in, burn_t, ode=False, ext_iter=0, disable_z=False, use_pixelcnn=False, pixelcnn_reg=None):
         self.sde        = sde
+        self.ode        = ode
         self.steps      = steps
         self.target_snr = target_snr
         self.nr_samples = nr_samples
         self.burn_in    = burn_in
         self.burn_t     = burn_t
         self.burn_flag  = True
-        self.map_end    = map_end
-        self.last_iteration   = last_iteration
-        self.last_step_factor = last_step_factor
+        self.ext_iter   = ext_iter
         self.disable_z        = disable_z
         self.use_pixelcnn     = use_pixelcnn
         self.pixelcnn_reg     = pixelcnn_reg
@@ -300,8 +300,13 @@ class posterior_sampler():
 
                 grad_data_fidelity = AHA(utils.float2cplx(x_val))
                 grad_data_fidelity = utils.cplx2float(grad_data_fidelity)
-
-                x_val = x_val + tau*score - std*s_stepsize*grad_data_fidelity + s_stepsize*std*noisy_x + noise
+                if isinstance(grad_data_fidelity, cp.ndarray):
+                    grad_data_fidelity = cp.asnumpy(grad_data_fidelity)
+                    noisy_x = cp.asnumpy(noisy_x)
+                if self.ode:
+                    x_val = x_val + tau*score - std*s_stepsize*grad_data_fidelity + s_stepsize*std*noisy_x
+                else:
+                    x_val = x_val + tau*score - std*s_stepsize*grad_data_fidelity + s_stepsize*std*noisy_x + noise
 
                 if self.use_pixelcnn:
                     scale = np.max(abs(utils.float2cplx(x_val)))
@@ -316,26 +321,18 @@ class posterior_sampler():
 
                 xs.append(x_val)
 
-        if self.map_end:
-            t_i = t_vals[-1]
-            for _ in range(self.last_iteration):
+        if self.ext_iter != 0:
+            t_i = t_vals[-2]
+            for _ in range(self.ext_iter):
 
-                if self.burn_in and t_i > self.burn_t:
-                    tau, _, noise = sess.run(get_noise_op_1, feed_dict={x: x_val, t: [t_i]*cur_samples})
-                else:
-                    tau, _, noise = sess.run(get_noise_op_2, feed_dict={x: x_val, t: [t_i]*cur_samples})
-
+                tau, _, noise = sess.run(get_noise_op_2, feed_dict={x: x_val, t: [t_i]*cur_samples})
                 score =  self.target_snr*sess.run(score_op,  {x: x_val, t: [t_i]*cur_samples})
-                
-                float_shape = x_val.shape
-                _, sigma = self.sde.marginal_prob(AHy, t_i)
-                z = utils.float2cplx(sess.run(tf.random.normal(float_shape, seed=self.sde.seed)*sigma))
-                noisy_x = utils.cplx2float(AHy + np.squeeze(AHA(z)))
+                x_ = utils.cplx2float(AHy)
 
-                grad_data_fidelity = AHA(utils.float2cplx(x_val+tau*score))
+                grad_data_fidelity = AHA(utils.float2cplx(x_val))
                 grad_data_fidelity = utils.cplx2float(grad_data_fidelity)
 
-                x_val = x_val + tau*score - std*s_stepsize*grad_data_fidelity*self.last_step_factor + s_stepsize*std*noisy_x*self.last_step_factor + noise
+                x_val = x_val + tau*score - std*s_stepsize*grad_data_fidelity + s_stepsize*std*x_
 
                 xs.append(x_val)
 

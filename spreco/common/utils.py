@@ -9,6 +9,7 @@ import yaml
 
 import subprocess as sp
 import numpy as np
+import cupy as cp
 from skimage.metrics import structural_similarity, peak_signal_noise_ratio
 import matplotlib
 matplotlib.use('Agg')
@@ -16,10 +17,16 @@ import matplotlib.pyplot as plt
 
 
 def float2cplx(float_in):
-    return np.array(float_in[...,0]+1.0j*float_in[...,1], dtype='complex64')
+    if isinstance(float_in, np.ndarray):
+        return np.array(float_in[...,0]+1.0j*float_in[...,1], dtype='complex64')
+    else:
+        return cp.asarray(float_in[...,0]+1.0j*float_in[...,1], dtype='complex64')
 
 def cplx2float(cplx_in):
-    return np.array(np.stack((cplx_in.real, cplx_in.imag), axis=-1), dtype='float32')
+    if isinstance(cplx_in, np.ndarray):
+        return np.array(np.stack((cplx_in.real, cplx_in.imag), axis=-1), dtype='float32')
+    else:
+        return cp.asarray(cp.stack((cplx_in.real, cplx_in.imag), axis=-1), dtype='float32')
 
 def log_to(file, vars, mode="a", clear=False, end='\n', prefix=None):
     if clear:
@@ -84,6 +91,11 @@ def check_out(cmd, split=True):
 def find_files(path, pattern):
     cmd = "find " + path + " -type f -name " + pattern
     return check_out(cmd)
+
+def read_filelist(filename):
+    with open(filename) as f:
+        lines = [line.rstrip() for line in f]
+        return lines
 
 def list_data_sys(path, suffix, ex_pattern=None):
     """
@@ -180,7 +192,10 @@ def normalize_with_max(x, axis=(0,1), data_chns='CPLX'):
     x is complex value
     x = x/(max(abs(x)))
     """
-    scalor = np.max(abs(x), axis)
+    if isinstance(x, np.ndarray):
+        scalor = np.max(abs(x), axis)
+    else:
+        scalor = cp.max(abs(x), axis)
 
     if data_chns == 'CPLX':
         normalized_x = cplx2float(x/scalor)
@@ -398,7 +413,7 @@ def norm_to_uint(inp, bit=8):
 
 def psnr(img1, img2, bit=16, tobit=False):
     """
-    calculate peak SNR 
+    calculate peak SNR, img1-true, img2-test
     """
     pixel_max = np.max(img2)
     

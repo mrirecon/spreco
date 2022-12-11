@@ -35,9 +35,9 @@ def main(config_path):
 
         if mask is None:
             if not config['poisson']:
-                mask = sampling_pattern.gen_mask_2D(nx, ny, center_r = config['cal'], undersampling = config['sampling_rate'])
+                mask = sampling_pattern.gen_mask_2d_equally_skip(factor_x=config['fx'], factor_y=config['fy'])
             else:
-                mask = utils.bart(1, 'poisson -Y %d -Z %d -y %f -z %f -s 1234 -v -C %d'%(nx, ny, config['fx'], config['fy'], config['cal']))
+                mask = utils.bart(1, 'poisson -Y %d -Z %d -y %f -z %f -s 1234 -C %d'%(nx, ny, config['fx'], config['fy'], config['cal']))
                 mask = np.squeeze(mask)
 
         und_ksp = kspace*abs(mask[..., np.newaxis])
