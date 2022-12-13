@@ -1,18 +1,18 @@
 import shutil
 import os
-import sys
-file_path = os.path.realpath(__file__)
-root_path = file_path.split('/wash_data')[0]
-sys.path.append(root_path)
 
 import numpy as np
 from numpy.fft import fftshift, ifftshift, ifft2
 
 import h5py
-from common import utils
+from spreco.common import utils
 from tqdm import tqdm
 
 data_path = '/home/ague/data/gluo/nyu_dataset/brain/multicoil_train'
+
+"""
+The nyu brain dataset has four types of constrast: AXT1POST, AXT2, AXT1 and AXFLAIR
+"""
 
 #contrast = 'AXT1POST'
 #image_shape = [320, 320] # 949*16 = 15184
@@ -26,7 +26,7 @@ data_path = '/home/ague/data/gluo/nyu_dataset/brain/multicoil_train'
 contrast = 'AXFLAIR'
 image_shape = [320, 320] #344*16=5504
 
-files_list = utils.find_files(data_path, '*%s_*.h5'%contrast) # 1. AXT1POST 2. AXT2 3. AXT1 4. AXFLAIR
+files_list = utils.find_files(data_path, '*%s_*.h5'%contrast)
 
 savepath = "/home/ague/data/gluo/dataset/brain_mat_nyu/tmp"
 
