@@ -7,7 +7,6 @@ from spreco.common import utils, ops
 import tqdm
 import tensorflow.compat.v1 as tf
 import numpy as np
-import cupy as cp
 
 class sde():
     """
@@ -300,9 +299,6 @@ class posterior_sampler():
 
                 grad_data_fidelity = AHA(utils.float2cplx(x_val))
                 grad_data_fidelity = utils.cplx2float(grad_data_fidelity)
-                if isinstance(grad_data_fidelity, cp.ndarray):
-                    grad_data_fidelity = cp.asnumpy(grad_data_fidelity)
-                    noisy_x = cp.asnumpy(noisy_x)
                 if self.ode:
                     x_val = x_val + tau*score - std*s_stepsize*grad_data_fidelity + s_stepsize*std*noisy_x
                 else:
