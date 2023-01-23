@@ -9,7 +9,6 @@ import yaml
 
 import subprocess as sp
 import numpy as np
-import cupy as cp
 from skimage.metrics import structural_similarity, peak_signal_noise_ratio
 import matplotlib
 matplotlib.use('Agg')
@@ -17,16 +16,10 @@ import matplotlib.pyplot as plt
 
 
 def float2cplx(float_in):
-    if isinstance(float_in, np.ndarray):
-        return np.array(float_in[...,0]+1.0j*float_in[...,1], dtype='complex64')
-    else:
-        return cp.asarray(float_in[...,0]+1.0j*float_in[...,1], dtype='complex64')
+    return np.array(float_in[...,0]+1.0j*float_in[...,1], dtype='complex64')
 
 def cplx2float(cplx_in):
-    if isinstance(cplx_in, np.ndarray):
-        return np.array(np.stack((cplx_in.real, cplx_in.imag), axis=-1), dtype='float32')
-    else:
-        return cp.asarray(cp.stack((cplx_in.real, cplx_in.imag), axis=-1), dtype='float32')
+    return np.array(np.stack((cplx_in.real, cplx_in.imag), axis=-1), dtype='float32')
 
 def log_to(file, vars, mode="a", clear=False, end='\n', prefix=None):
     if clear:
@@ -192,10 +185,7 @@ def normalize_with_max(x, axis=(0,1), data_chns='CPLX'):
     x is complex value
     x = x/(max(abs(x)))
     """
-    if isinstance(x, np.ndarray):
-        scalor = np.max(abs(x), axis)
-    else:
-        scalor = cp.max(abs(x), axis)
+    scalor = np.max(abs(x), axis)
 
     if data_chns == 'CPLX':
         normalized_x = cplx2float(x/scalor)
