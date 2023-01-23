@@ -42,10 +42,10 @@ class pixelcnn():
             batch_size = self.config['batch_size']
         
 
-        self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'])
+        self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'], name='input_0')
 
         if self.config['conditional']:
-            self.t = tf.placeholder(tf.float32, shape=[batch_size])
+            self.t = tf.placeholder(tf.float32, shape=[batch_size], name='input_1')
         else:
             self.t = None
 
@@ -114,10 +114,11 @@ class pixelcnn():
             init_pass = self.forward(self.x, init=True, dropout_p=0., **model_opt) 
             self.out = self.forward(self.x, dropout_p=0., **model_opt)
 
-            loss = loss_func(self.x, self.out)
-            self.loss = loss/(np.log(2.0)*np.prod(self.config['input_shape'])*1)
+            self.loss = loss_func(self.x, self.out)/(np.log(2.0)*np.prod(self.config['input_shape'])*1)
 
+            output = tf.identity(tf.stack([self.loss, tf.zeros_like(self.loss)], axis=-1), name='output_0')
             self.grads = tf.squeeze(tf.gradients(self.loss, self.x), name='grad_0')
+            grad_ys = tf.placeholder(tf.float32, shape=[2], name='grad_ys_0')
 
 
     @staticmethod
