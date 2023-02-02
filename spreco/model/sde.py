@@ -227,13 +227,13 @@ class posterior_sampler():
             sigma     = tf.gather(self.sde.sigmas, timestep)
             bools     = tf.equal(timestep, tf.zeros_like(t, tf.int32))
             adj_sigma = tf.where(bools, tf.zeros_like(timestep, tf.float32), tf.gather(self.sde.sigmas, tf.cast(timestep-1, tf.int32)))
-            tau = (sigma ** 2 - adj_sigma ** 2)
-            std = tf.sqrt(adj_sigma ** 2 * tau / (sigma ** 2))
+            diff2 = (sigma ** 2 - adj_sigma ** 2)
+            tau = tf.sqrt(adj_sigma ** 2 * diff2 / (sigma ** 2))
+            diff2 = diff2[:, tf.newaxis, tf.newaxis, tf.newaxis]
             tau = tau[:, tf.newaxis, tf.newaxis, tf.newaxis]
-            std = std[:, tf.newaxis, tf.newaxis, tf.newaxis]
 
-            noise = tf.random.normal(shape, seed=self.sde.seed)*std
-            return tau, std, noise
+            noise = tf.random.normal(shape, seed=self.sde.seed)*tau
+            return tau, diff2, noise
         
         @tf.function
         def get_noise_2(x, t):
@@ -243,13 +243,13 @@ class posterior_sampler():
             sigma     = tf.gather(self.sde.sigmas, timestep)
             bools     = tf.equal(timestep, tf.zeros_like(t, tf.int32))
             adj_sigma = tf.where(bools, tf.zeros_like(timestep, tf.float32), tf.gather(self.sde.sigmas, tf.cast(timestep-1, tf.int32)))
-            tau = (sigma ** 2 - adj_sigma ** 2)
-            std = tf.sqrt(adj_sigma ** 2 * tau / (sigma ** 2))
+            diff2 = (sigma ** 2 - adj_sigma ** 2)
+            tau = tf.sqrt(adj_sigma ** 2 * diff2 / (sigma ** 2))
+            diff2 = diff2[:, tf.newaxis, tf.newaxis, tf.newaxis]
             tau = tau[:, tf.newaxis, tf.newaxis, tf.newaxis]
-            std = std[:, tf.newaxis, tf.newaxis, tf.newaxis]
 
-            noise = tf.random.normal(shape, seed=self.sde.seed)*std
-            return tau, std, noise
+            noise = tf.random.normal(shape, seed=self.sde.seed)*tau
+            return diff2, tau, noise
 
 
         score_op = self.sde.score(x, t)
@@ -282,9 +282,9 @@ class posterior_sampler():
                         self.burn_flag = False
 
                 if self.burn_in and t_i > self.burn_t:
-                    tau, std, noise = sess.run(get_noise_op_1, feed_dict={x: x_val, t: [t_i]*cur_samples})
+                    diff2, tau, noise = sess.run(get_noise_op_1, feed_dict={x: x_val, t: [t_i]*cur_samples})
                 else:
-                    tau, std, noise = sess.run(get_noise_op_2, feed_dict={x: x_val, t: [t_i]*cur_samples})
+                    diff2, tau, noise = sess.run(get_noise_op_2, feed_dict={x: x_val, t: [t_i]*cur_samples})
 
                 score =  self.target_snr*sess.run(score_op,  {x: x_val, t: [t_i]*cur_samples})
                 
@@ -300,9 +300,9 @@ class posterior_sampler():
                 grad_data_fidelity = AHA(utils.float2cplx(x_val))
                 grad_data_fidelity = utils.cplx2float(grad_data_fidelity)
                 if self.ode:
-                    x_val = x_val + tau*score - std*s_stepsize*grad_data_fidelity + s_stepsize*std*noisy_x
+                    x_val = x_val + diff2*score - tau*s_stepsize*grad_data_fidelity + s_stepsize*tau*noisy_x
                 else:
-                    x_val = x_val + tau*score - std*s_stepsize*grad_data_fidelity + s_stepsize*std*noisy_x + noise
+                    x_val = x_val + diff2*score - tau*s_stepsize*grad_data_fidelity + s_stepsize*tau*noisy_x + noise
 
                 if self.use_pixelcnn:
                     scale = np.max(abs(utils.float2cplx(x_val)))
@@ -321,14 +321,14 @@ class posterior_sampler():
             t_i = t_vals[-2]
             for _ in range(self.ext_iter):
 
-                tau, _, noise = sess.run(get_noise_op_2, feed_dict={x: x_val, t: [t_i]*cur_samples})
+                diff2, _, noise = sess.run(get_noise_op_2, feed_dict={x: x_val, t: [t_i]*cur_samples})
                 score =  self.target_snr*sess.run(score_op,  {x: x_val, t: [t_i]*cur_samples})
                 x_ = utils.cplx2float(AHy)
 
                 grad_data_fidelity = AHA(utils.float2cplx(x_val))
                 grad_data_fidelity = utils.cplx2float(grad_data_fidelity)
 
-                x_val = x_val + tau*score - std*s_stepsize*grad_data_fidelity + s_stepsize*std*x_
+                x_val = x_val + diff2*score - tau*s_stepsize*grad_data_fidelity + s_stepsize*tau*x_
 
                 xs.append(x_val)
 
