@@ -58,8 +58,8 @@ def main(config_path):
 
             sigma     = sigmas[i]
             adj_sigma = sigmas[i+1]
-            tau       = (sigma ** 2 - adj_sigma ** 2)
-            std       = np.sqrt(adj_sigma ** 2 * tau / (sigma ** 2))
+            diff2     = (sigma ** 2 - adj_sigma ** 2)
+            tau       = np.sqrt(adj_sigma ** 2 * diff2 / (sigma ** 2))
 
             if burn_in and i<burn_step:
                 z      = np.random.randn(1, nx, ny, 2) * sigma
@@ -84,8 +84,8 @@ def main(config_path):
                 score = grad_logp(x_mod, labels)
                 grad_data_fidelity = ops.AHA(utils.float2cplx(x_mod), coilsen[np.newaxis, ...], mask[np.newaxis, ...], shape, center=center)
                 grad_data_fidelity = utils.cplx2float(grad_data_fidelity)
-                noise = np.random.randn(*x_mod.shape) * std
-                x_mod = x_mod + psnr*tau*score - std*lamb*grad_data_fidelity + lamb*std*noise_x_ + noise
+                noise = np.random.randn(*x_mod.shape) * tau
+                x_mod = x_mod + psnr*diff2*score - tau*lamb*grad_data_fidelity + lamb*tau*noise_x_ + noise
                 
                 if False:
                     noise = np.random.randn(*x_mod.shape) * std
