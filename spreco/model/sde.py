@@ -216,7 +216,7 @@ class posterior_sampler():
 
         self.grad_logp_p = grad_logp_p
 
-    def conditional_ancestral_sampler(self, x, t, sess, AHA, AHy, s_stepsize, st=100):
+    def conditional_ancestral_sampler(self, x, t, sess, AHA, AHy, s_stepsize, st=100, skip=1):
       
         @tf.function
         def get_noise_1(x, t):
@@ -271,7 +271,7 @@ class posterior_sampler():
         else:
             cur_samples=1
 
-        for t_i in tqdm.tqdm(t_vals[st:-1]):
+        for t_i in tqdm.tqdm(t_vals[st:-1:skip]):
             for _ in range(self.steps):
 
                 if self.burn_in: # just one time

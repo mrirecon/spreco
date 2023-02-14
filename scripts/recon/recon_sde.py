@@ -101,7 +101,7 @@ def main(config_path):
     ins_sampler.shape = shape
     ins_sampler.und_ksp = und_ksp
 
-    image = ins_sampler.conditional_ancestral_sampler(x, t, sess, AHA, zero_filled[np.newaxis, ...], config['s_stepsize'], st=config['st'])
+    image = ins_sampler.conditional_ancestral_sampler(x, t, sess, AHA, zero_filled[np.newaxis, ...], config['s_stepsize'], st=config['st'], skip=config['skip'])
 
     if config['burn_in']:
         idx = int(ins_sampler.sde.N*config['burn_t']*config['c_steps']) - config['c_steps']
