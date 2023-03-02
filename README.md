@@ -21,8 +21,8 @@ This package is to help you extract prior information for MRI image and then use
 
 ## Quickstart with colab
 
-1. Sample the posterior [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrirecon/spreco/blob/main/scripts/demo_recon.ipynb)
-2. Train an image prior [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrirecon/spreco/blob/main/scripts/demo_train.ipynb)
+1. Sample the posterior [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrirecon/spreco/blob/main/examples/scripts/demo_recon.ipynb)
+2. Train an image prior [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrirecon/spreco/blob/main/examples/scripts/demo_train.ipynb)
 
 ## Reference 
 Please use tag "mrm_paper" to get code to generate results in following references. We would appreciate it if you used our codes and cited our work.
