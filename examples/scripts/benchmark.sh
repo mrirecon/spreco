@@ -1,7 +1,7 @@
 set -e
 
 export TF_CPP_MIN_LOG_LEVEL=3
-root_path=/home/gluo/spreco
+root_path=/home/gluo/graz/spreco
 
 recon()
 {
