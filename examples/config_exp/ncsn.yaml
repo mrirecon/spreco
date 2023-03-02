@@ -6,10 +6,10 @@ lr: 0.0001
 begin_sigma: 0.3
 end_sigma: 0.01
 anneal_power: 2.
-nr_levels: 10
-affine_x: True
+nr_levels: 20
+affine_x: false
 nonlinearity: 'elu'
-nr_filters: 64
+nr_filters: 100
 
 seed: 1234
 max_keep: 100
@@ -25,6 +25,6 @@ num_prepare: 10
 print_loss: True
 parts: 
     - [{func: 'npz_loader', key: 'rss'}, {func: 'squeeze'}, {func: 'normalize_with_max'}, {func: 'slice_image', shape: [256, 256, 2]}]
-    - [{func: 'randint', nr_levels: 10}]
-nr_gpu: 2
-gpu_id: '1,2'
+    - [{func: 'randint', nr_levels: 20}]
+nr_gpu: 3
+gpu_id: '1,2,3'

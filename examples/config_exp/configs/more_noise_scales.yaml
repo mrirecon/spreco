@@ -1,6 +1,6 @@
 burn_in: false
 burn_t: 0.5
-c_steps: 5
+c_steps: 50
 cal: 20
 compute_residual: true
 ksp_path: /home/ague/data/gluo/dataset/LI/LI, Dahui_T2S_1.npz
@@ -11,8 +11,10 @@ poisson: true
 fx: 1.5
 fy: 1.5
 s_stepsize: 25
-st: 30
+st: 40
 target_snr: 1
 workspace: /home/gluo/workspace/sampling_posterior/more_noise_scales
 disable_z: True
 gpu_id: '3'
+skip: 6
+save_intermediate: true
