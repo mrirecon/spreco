@@ -134,6 +134,8 @@ class cond_refine_net_plus():
             self.forward       = tf.make_template('forward', self.small_body)
         elif config['body'] == 'big':
             self.forward       = tf.make_template('forward', self.big_body)
+        elif config['body'] == 'huge':
+            self.forward       = tf.make_template('forward', self.huge_body)
         else:
             raise Exception('body option is wrong.')
 
@@ -222,6 +224,70 @@ class cond_refine_net_plus():
             
 
             out = self.normalizer(refine_3)
+            out = self.nonlinearity(out)
+            out = nn.conv2d_plus(out, num_filters=self.chns, nonlinearity=None)
+            
+            self.counters = {} # reset counters
+            out = out / t[:, tf.newaxis, tf.newaxis, tf.newaxis]
+            return out
+    
+    def huge_body(self, x, t):
+        """
+        multi level refine net conditional on t
+        """
+        if self.affine_x:
+            x = 2*x - 1
+        
+        with arg_scope([nn.conv2d_plus, nn.embed_t, nn.nin, cond_refine_block, cond_crp_block, cond_rcu_block, cond_msf_block, cond_res_block,nn.self_attention, nn.instance_norm_plus],
+                                 nonlinearity=self.nonlinearity, counters=self.counters, normalizer=self.normalizer):
+            
+            proj_t = nn.embed_t(tf.math.log(t), embedding_size=self.nr_filters, scale=self.fourier_scale)
+
+            proj_t = nn.nin(proj_t, self.nr_filters * 2, self.nonlinearity)
+            proj_t = nn.nin(proj_t, self.nr_filters*4)
+
+            x_level_0 = nn.conv2d_plus(x, num_filters=1*self.nr_filters, nonlinearity=None)
+
+            x_level_1_0 = cond_res_block(x_level_0, h=proj_t, out_filters=1*self.nr_filters, rescale=False)
+            x_level_1_1 = cond_res_block(x_level_1_0, h=proj_t, out_filters=1*self.nr_filters, rescale=False)
+
+            x_level_2_0 = cond_res_block(x_level_1_1, h=proj_t, out_filters=2*self.nr_filters, rescale=True)
+            x_level_2_1 = cond_res_block(x_level_2_0, h=proj_t, out_filters=2*self.nr_filters, rescale=False)
+
+            x_level_3_0 = cond_res_block(x_level_2_1, h=proj_t, out_filters=2*self.nr_filters, rescale=True)
+            x_level_3_1 = cond_res_block(x_level_3_0, h=proj_t, out_filters=2*self.nr_filters, rescale=False)
+
+            x_level_4_0 = cond_res_block(x_level_3_1, h=proj_t, out_filters=2*self.nr_filters, rescale=False, dilation=2)
+            x_level_4_1 = cond_res_block(x_level_4_0, h=proj_t, out_filters=2*self.nr_filters, rescale=True,)
+
+            if self.attention:
+                x_level_4_1 = nn.self_attention(x_level_4_1, qk_chns=2*self.nr_filters, v_chns=2*self.nr_filters)
+            x_level_5_0 = cond_res_block(x_level_4_1, h=proj_t, out_filters=2*self.nr_filters, rescale=False, dilation=4)
+            x_level_5_1 = cond_res_block(x_level_5_0, h=proj_t, out_filters=2*self.nr_filters, rescale=True,)
+
+            if self.attention:
+                x_level_5_1 = nn.self_attention(x_level_5_1, qk_chns=2*self.nr_filters, v_chns=2*self.nr_filters)
+            x_level_6_0 = cond_res_block(x_level_5_1, h=proj_t, out_filters=2*self.nr_filters, rescale=False, dilation=4)
+            x_level_6_1 = cond_res_block(x_level_6_0, h=proj_t, out_filters=2*self.nr_filters, rescale=True,)
+
+            if self.attention:
+                x_level_6_1 = nn.self_attention(x_level_6_1, qk_chns=2*self.nr_filters, v_chns=2*self.nr_filters)
+
+            refine_0 = cond_refine_block([x_level_6_1], h=proj_t, nr_filters=2*self.nr_filters, out_shape=nn.int_shape(x_level_6_1)[1:3])
+            if self.attention:
+                refine_0 = nn.self_attention(refine_0, qk_chns=2*self.nr_filters, v_chns=2*self.nr_filters)
+            refine_1 = cond_refine_block([x_level_5_1, refine_0], h=proj_t, nr_filters=2*self.nr_filters, out_shape=nn.int_shape(x_level_5_1)[1:3])
+            if self.attention:
+                refine_1 = nn.self_attention(refine_1, qk_chns=2*self.nr_filters, v_chns=2*self.nr_filters)
+            refine_2 = cond_refine_block([x_level_4_1, refine_1], h=proj_t, nr_filters=2*self.nr_filters, out_shape=nn.int_shape(x_level_4_1)[1:3])
+            if self.attention:
+                refine_2 = nn.self_attention(refine_2, qk_chns=2*self.nr_filters, v_chns=2*self.nr_filters)
+            refine_3 = cond_refine_block([x_level_3_1, refine_2], h=proj_t, nr_filters=1*self.nr_filters, out_shape=nn.int_shape(x_level_3_1)[1:3])    
+            refine_4 = cond_refine_block([x_level_2_1, refine_3], h=proj_t, nr_filters=1*self.nr_filters, out_shape=nn.int_shape(x_level_2_1)[1:3])
+            refine_5 = cond_refine_block([x_level_1_1, refine_4], h=proj_t, nr_filters=1*self.nr_filters, out_shape=nn.int_shape(x_level_1_1)[1:3], end=True)
+            
+
+            out = self.normalizer(refine_5)
             out = self.nonlinearity(out)
             out = nn.conv2d_plus(out, num_filters=self.chns, nonlinearity=None)
             

@@ -31,16 +31,37 @@ class sde():
         self.eps       = config['eps']
         self.sigmas    = tf.exp(tf.linspace(tf.log(self.sigma_min), tf.log(self.sigma_max), self.N))
 
-        self.learning_rate = tf.placeholder(tf.float32, shape=[])
+        """self.learning_rate = tf.placeholder(tf.float32, shape=[])
         ###
         self.x       = [tf.placeholder(tf.float32, 
                                shape=[self.config['batch_size']]+self.config['input_shape'], name="input_%d"%i
                                ) for i in range(self.config['nr_gpu'])]
         self.t            = [tf.placeholder(tf.float32,
                                shape=[self.config['batch_size']]) for _ in range(config['nr_gpu'])]
-        self.ins_outs     = {'inputs': self.x, 't': self.t}
+        self.ins_outs     = {'inputs': self.x, 't': self.t}"""
         self.seed         = config['seed']
 
+    def init_placeholder(self, mode=0):
+
+        if mode == 0:
+            # training
+            self.learning_rate  = tf.placeholder(tf.float32, shape=[])
+            self.x              = [tf.placeholder(tf.float32, 
+                                   shape=[self.config['batch_size']]+self.config['input_shape'], name="input_%d"%i
+                                   ) for i in range(self.config['nr_gpu'])]
+            self.t            = [tf.placeholder(tf.float32,
+                                   shape=[self.config['batch_size']]) for _ in range(self.config['nr_gpu'])]
+            self.ins_outs     = {'inputs': self.x, 't': self.t}
+
+        if mode == 1:
+            # inference
+            self.x = tf.placeholder(tf.float32, shape=[self.config['batch_size']]+self.config['input_shape'])
+            self.t = tf.placeholder(tf.float32, shape=[self.config['batch_size']])
+
+        if mode == 2:
+            # exporting
+            self.x = tf.placeholder(tf.float32, shape=[self.config['batch_size']]+self.config['input_shape'], name="input_0")
+            self.t = tf.placeholder(tf.int32, shape=[self.config['batch_size']], name="input_1")
 
     def sde(self, x, t):
 
@@ -137,10 +158,12 @@ class sde():
 
         return loss
     
-    def prep(self, export =True):
-        """create training objective"""
+    def init(self, mode=0):
 
-        if not export:
+        self.init_placeholder(mode)
+
+        if mode == 0:
+
             _          = self.loss(self.x[0], self.t[0])
             all_params = tf.trainable_variables()
 
@@ -161,7 +184,7 @@ class sde():
 
                     # test
                     loss_test.append(self.loss(self.x[i], self.t[i]))
-                
+
             with tf.device('/gpu:0'):
                 for i in range(1, self.config['nr_gpu']):
                     loss[0] += loss[i]
@@ -172,10 +195,15 @@ class sde():
             self.train_op = optimizer.apply_gradients(grads_avg)
             self.loss_train = loss[0]/self.config['nr_gpu']
             self.loss_test  = loss_test[0]/self.config['nr_gpu']
-        else:
-            _          = self.loss(self.x[0], self.t[0])
-            all_params = tf.trainable_variables()
 
+        elif mode == 1:
+            _  = self.loss(self.x, self.t)
+
+        elif mode == 2:
+            _  = self.loss(self.x, self.t)
+
+        else:
+            raise ValueError("Value for mode selection is wrong, only 0,1,2 are valid.")
 
 class posterior_sampler():
 

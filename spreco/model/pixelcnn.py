@@ -1,4 +1,5 @@
 from spreco.model import nn
+from spreco.model.utils import concat_elu
 from spreco.common.custom_adam import AdamOptimizer
 from spreco.common.options import DATA_CHNS
 
@@ -13,43 +14,43 @@ class pixelcnn():
         self.config         = config
         self.forward        = tf.make_template('forward', self.body)
 
-    def init_training(self):
-        """
-        initialize placeholder for training
-        """
-        self.learning_rate = tf.placeholder(tf.float32, shape=[])
-        self.x  = [tf.placeholder(tf.float32, 
+    def init_placeholder(self, mode=0):
+
+        if mode == 0:
+            # training
+            self.learning_rate = tf.placeholder(tf.float32, shape=[])
+            self.x  = [tf.placeholder(tf.float32, 
                                shape=[self.config['batch_size']]+self.config['input_shape'], name="input_%d"%i
                                ) for i in range(self.config['nr_gpu'])]
-        if self.config['conditional']:
-            self.t = [tf.placeholder(tf.float32, shape=[self.config['batch_size']]) for _ in range(self.config['nr_gpu'])]
-        else:
-            self.t = [None for _ in range(self.config['nr_gpu'])]
+            if self.config['conditional']:
+                self.t = [tf.placeholder(tf.float32, shape=[self.config['batch_size']]) for _ in range(self.config['nr_gpu'])]
+            else:
+                self.t = [None for _ in range(self.config['nr_gpu'])]
 
-        if self.config['conditional']:
-            self.ins_outs     = {'inputs': self.x, 't': self.t}
-        else:
-            self.ins_outs     = {'inputs': self.x}
+            if self.config['conditional']:
+                self.ins_outs     = {'inputs': self.x, 't': self.t}
+            else:
+                self.ins_outs     = {'inputs': self.x}
 
+        elif mode == 1:
+            # inferencing
+            self.x  = tf.placeholder(tf.float32, shape=[self.config['batch_size']]+self.config['input_shape']) 
 
-    def init_inference(self, batch_size=None):
-        """
-        initialize placeholder for inference, on a single gpu
+            if self.config['conditional']:
+                self.t = tf.placeholder(tf.float32, shape=[self.config['batch_size']])
+            else:
+                self.t = None
 
-        """
+        elif mode == 2:
+            # exporting
+            self.x  = tf.placeholder(tf.float32, shape=[self.config['batch_size']]+self.config['input_shape'], name='input_0')
+            #self.x  = tf.transpose(self.x, [0, 2, 1, 3])
+            if self.config['conditional']:
+                self.t = tf.placeholder(tf.float32, shape=[self.config['batch_size']], name='input_1')
+            else:
+                self.t = None
 
-        if batch_size is None:
-            batch_size = self.config['batch_size']
-        
-
-        self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'], name='input_0')
-
-        if self.config['conditional']:
-            self.t = tf.placeholder(tf.float32, shape=[batch_size], name='input_1')
-        else:
-            self.t = None
-
-    def prep(self, export=False):
+    def init(self, mode=0):
 
         model_opt = {'nr_resnet': self.config['nr_resnet'],
                      'nr_filters': self.config['nr_filters'],
@@ -75,8 +76,9 @@ class pixelcnn():
         if self.config['data_chns'] == DATA_CHNS.MAG:
             from spreco.model.logistic_loss import discretized_mix_logistic_loss_1 as loss_func
 
-        if not export:
-            self.init_training()
+        self.init_placeholder(mode)
+
+        if mode == 0:
             init_pass = self.forward(self.x[0], init=True, dropout_p=self.config['dropout_rate'], **model_opt) # initialization of parameters
             all_params = tf.trainable_variables()
 
@@ -109,15 +111,27 @@ class pixelcnn():
             self.train_op    = optimizer.apply_gradients(grads_avg)
             self.loss_train  = loss[0]/(np.log(2.0)*np.prod(self.config['input_shape'])*self.config['batch_size']*self.config['nr_gpu'])
             self.loss_test   = loss_test[0]/(np.log(2.0)*np.prod(self.config['input_shape'])*self.config['batch_size']*self.config['nr_gpu'])
-        else:
-            self.init_inference(1)
+        
+        elif mode == 1:
+
             init_pass = self.forward(self.x, init=True, dropout_p=0., **model_opt) 
             self.out = self.forward(self.x, dropout_p=0., **model_opt)
 
-            self.loss = loss_func(self.x, self.out)/(np.log(2.0)*np.prod(self.config['input_shape'])*1)
+            loss = loss_func(self.x, self.out)
+            self.loss = loss/(np.log(2.0)*np.prod(self.config['input_shape'])*1)
 
-            output = tf.identity(tf.stack([self.loss, tf.zeros_like(self.loss)], axis=-1), name='output_0')
-            self.grads = tf.squeeze(tf.gradients(self.loss, self.x), name='grad_0')
+            self.grads = tf.squeeze(tf.gradients(self.loss, self.x), name='grad_0') 
+        
+        elif mode == 2:
+            init_pass = self.forward(self.x, init=True, dropout_p=0., **model_opt) 
+            self.out = self.forward(self.x, dropout_p=0., **model_opt)
+
+            loss = loss_func(self.x, self.out)
+            loss = loss/(np.log(2.0)*np.prod(self.config['input_shape'])*1)
+
+            output = tf.identity(tf.stack([loss, tf.zeros_like(loss)], axis=-1), name='output_0')
+            self.grads = tf.squeeze(tf.gradients(loss, self.x), name='grad_0') 
+            #self.grads = tf.transpose(self.grads, [1, 0, 2], name='grad_0')
             grad_ys = tf.placeholder(tf.float32, shape=[2], name='grad_ys_0')
 
 
