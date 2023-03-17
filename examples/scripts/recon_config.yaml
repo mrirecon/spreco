@@ -5,7 +5,7 @@ poisson: true
 sampling_rate: 0.2
 s_stepsize: 25
 st: 30
-c_steps: 5
+c_steps: 4
 nr_samples: 10
 burn_in: false
 burn_t: 0.5
