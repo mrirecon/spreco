@@ -1,8 +1,8 @@
-# Generative Pre-trained Image Prior for MRI reconstruction
+## Generative Pre-trained Image Prior for MRI reconstruction
 
 This package is to help you extract prior information for MRI image and then use it for MRI reconstruction. 
 
-# Installation
+## Installation
 
 1. Install with pip command
    ```shell
