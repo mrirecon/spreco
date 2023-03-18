@@ -1,8 +1,8 @@
-# Generative Pre-trained Image Prior for MRI reconstruction
+## Generative Pre-trained Image Prior for MRI reconstruction
 
 This package is to help you extract prior information for MRI image and then use it for MRI reconstruction. 
 
-# Installation
+## Installation
 
 1. Install with pip command
    ```shell
@@ -37,5 +37,5 @@ We would appreciate it if you tried our codes and cited our work.
 
 [2] Blumenthal, M, Luo, G, Schilling, M, Holme, HCM, Uecker, M. Deep, deep learning with BART. Magn Reson Med. 2023; 89: 678- 693.
 
-[3] Luo, G, Zhao, N, Jiang, W, Hui, ES, Cao, P. MRI reconstruction using deep Bayesian estimation. Magn Reson Med. 2020; 84: 2246–2261.
+[3] Luo, G, Zhao, N, Jiang, W, Hui, ES, Cao, P. MRI reconstruction using deep Bayesian estimation. Magn Reson Med. 2020; 84: 2246-2261.
 
