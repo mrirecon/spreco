@@ -6,10 +6,10 @@ setup(
     description='Training priors for MRI image reconstruction',
     packages=find_packages(),
     install_requires=[
-        'tensorflow-gpu==2.4.1',
+        'tensorflow-gpu',
         'tf-slim==1.1.0',
         'numpy',
-        'pillow==8.2.0',
+        'pillow',
         'matplotlib',
         'scikit-image',
         'pyyaml==5.4.1',
