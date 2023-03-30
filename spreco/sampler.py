@@ -56,7 +56,7 @@ class sampler():
         return xs, xs_mean
 
 
-    def ancestral_sampler(self, x, t, sess):
+    def ancestral_sampler(self, x, t, sess, skip=1):
         x_val     = sess.run(self.sde.prior_sampling(x.shape))
         t_vals    = np.linspace(self.sde.T, self.sde.eps, self.sde.N)
 
@@ -76,7 +76,7 @@ class sampler():
 
         update_op = update(x, t)
 
-        for t_i in tqdm.tqdm(t_vals):
+        for t_i in tqdm.tqdm(t_vals[0::skip]):
             x_val, x_mean = sess.run(update_op, {x: x_val, t: [t_i for _ in range(self.nr_chains)]})
             xs.append(x_val)
             xs_mean.append(x_mean)
