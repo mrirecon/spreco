@@ -4,10 +4,11 @@ import tqdm
 
 class sampler():
 
-    def __init__(self, sde, steps, target_snr):
+    def __init__(self, sde, steps, target_snr, nr_chains):
         self.sde        = sde
         self.steps      = steps
         self.target_snr = target_snr
+        self.nr_chains  = nr_chains
     
     def predictor(self, x, t):
         """
@@ -47,8 +48,8 @@ class sampler():
         xs        = []
         xs_mean   = []
         for t_i in tqdm.tqdm(t_vals[0::skip]):
-            x_val, x_mean = sess.run(corrector, {x: x_val, t: [t_i]})
-            x_val, x_mean = sess.run(predictor, {x: x_val, t: [t_i]})
+            x_val, x_mean = sess.run(corrector, {x: x_val, t: [t_i for _ in range(self.nr_chains)]})
+            x_val, x_mean = sess.run(predictor, {x: x_val, t: [t_i for _ in range(self.nr_chains)]})
             xs.append(x_val)
             xs_mean.append(x_mean)
         
@@ -66,14 +67,14 @@ class sampler():
             diffusion=self.sde.sde(x,t)[1]
             for _ in range(self.steps):
                 x_mean    = x + self.sde.score(x, t)*diffusion**2
-                std = diffusion#*self.sde.sigma_t(t-0.5/self.sde.N)/self.sde.sigma_t(t+0.5/self.sde.N)
+                std = diffusion*self.sde.sigma_t(t-0.5/self.sde.N)/self.sde.sigma_t(t+0.5/self.sde.N)
                 x = x_mean + tf.random.normal(x.shape, seed=self.sde.seed)*std
             return x, x_mean
 
         
         update_op = update(x, t)
         for t_i in tqdm.tqdm(t_vals):
-            x_val, x_mean = sess.run(update_op, {x: x_val, t: [t_i]})
+            x_val, x_mean = sess.run(update_op, {x: x_val, t: [t_i for _ in range(self.nr_chains)]})
             xs.append(x_val)
             xs_mean.append(x_mean)
 
