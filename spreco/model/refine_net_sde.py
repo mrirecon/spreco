@@ -120,7 +120,7 @@ class cond_refine_net_plus():
     for sde 
     """
 
-    def __init__(self, config, chns=2, normalizer=nn.instance_norm_plus):
+    def __init__(self, config, chns=2, normalizer=nn.instance_norm_plus, scale_out=True):
 
         self.chns          = chns
         self.nr_filters    = config['nr_filters']
@@ -130,6 +130,7 @@ class cond_refine_net_plus():
         self.affine_x      = config['affine_x']
         self.fourier_scale = config['fourier_scale']
         self.attention     = config['attention']
+        self.scale_out     = scale_out
         if config['body'] == 'small':
             self.forward       = tf.make_template('forward', self.small_body)
         elif config['body'] == 'big':
@@ -190,12 +191,13 @@ class cond_refine_net_plus():
             out = nn.conv2d_plus(out, num_filters=self.chns, nonlinearity=None)
             
             self.counters = {} # reset counters
-            out = out / t[:, tf.newaxis, tf.newaxis, tf.newaxis]
+            if self.scale_out:
+                out = out / t[:, tf.newaxis, tf.newaxis, tf.newaxis]
             return out
     
     def small_body(self, x, t):
         """
-        multi level refine net conditional on y
+        multi level refine net conditional on sigma_t, t
         """
         if self.affine_x:
             x = 2*x - 1
@@ -206,6 +208,7 @@ class cond_refine_net_plus():
             proj_t = nn.embed_t(tf.math.log(t), embedding_size=self.nr_filters, scale=self.fourier_scale)
 
             proj_t = nn.nin(proj_t, self.nr_filters * 2, self.nonlinearity)
+            proj_t = nn.nin(proj_t, self.nr_filters*4, nonlinearity=None)
 
             x_level_0 = nn.conv2d_plus(x, num_filters=1*self.nr_filters, nonlinearity=None)
             x_level_1_0 = cond_res_block(x_level_0, h=proj_t, out_filters=1*self.nr_filters, rescale=False)
@@ -228,7 +231,8 @@ class cond_refine_net_plus():
             out = nn.conv2d_plus(out, num_filters=self.chns, nonlinearity=None)
             
             self.counters = {} # reset counters
-            out = out / t[:, tf.newaxis, tf.newaxis, tf.newaxis]
+            if self.scale_out:
+                out = out / t[:, tf.newaxis, tf.newaxis, tf.newaxis]
             return out
     
     def huge_body(self, x, t):
@@ -292,5 +296,6 @@ class cond_refine_net_plus():
             out = nn.conv2d_plus(out, num_filters=self.chns, nonlinearity=None)
             
             self.counters = {} # reset counters
-            out = out / t[:, tf.newaxis, tf.newaxis, tf.newaxis]
+            if self.scale_out:
+                out = out / t[:, tf.newaxis, tf.newaxis, tf.newaxis]
             return out
