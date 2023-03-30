@@ -64,15 +64,18 @@ class sampler():
         xs_mean = []
 
         def update(x, t):
+
             diffusion=self.sde.sde(x,t)[1]
+
             for _ in range(self.steps):
-                x_mean    = x + self.sde.score(x, t)*diffusion**2
-                std = diffusion*self.sde.sigma_t(t-0.5/self.sde.N)/self.sde.sigma_t(t+0.5/self.sde.N)
-                x = x_mean + tf.random.normal(x.shape, seed=self.sde.seed)*std
+                x_mean = x + self.sde.score(x, t)*diffusion**2
+                ratio  = self.sde.sigma_t(t - 0.5/self.sde.N)/self.sde.sigma_t(t + 0.5/self.sde.N)
+                std    = diffusion*ratio[:, tf.newaxis, tf.newaxis, tf.newaxis]
+                x      = x_mean + tf.random.normal(x.shape, seed=self.sde.seed)*std
             return x, x_mean
 
-        
         update_op = update(x, t)
+
         for t_i in tqdm.tqdm(t_vals):
             x_val, x_mean = sess.run(update_op, {x: x_val, t: [t_i for _ in range(self.nr_chains)]})
             xs.append(x_val)
