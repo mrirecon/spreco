@@ -31,8 +31,8 @@ def diff(file1, file2):
         else:
             config1_has[k] = config1[k]
 
-    print("Same configs are ", common_same, "\n")
-    print("Different configs are ", common_diff, "\n")
+    print("The same common-configs are ", common_same, "\n")
+    print("The different common-configs are ", common_diff, "\n")
 
     print("The file1 has ", config1_has, "\n")
     print("The file2 has ", config2_has, "\n")
