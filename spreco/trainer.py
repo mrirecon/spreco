@@ -13,8 +13,6 @@ import time
 class trainer():
     """
     mode, 0: train
-    mode, 1: inference
-    mode, 2: export
     """
 
     def __init__(self, train_pipe, test_pipe, config, default_feed=True):
@@ -36,7 +34,7 @@ class trainer():
         self.default_feed = default_feed
 
 
-    def init_model(self, mode, feed_func=None, gpu_id=None):
+    def init_model(self, mode, feed_func=None, gpu_id=None, restore=False):
         
         if self.config['model'] == MODELS.NCSN:
             tf.random.set_random_seed(self.config['seed'])
@@ -198,36 +196,3 @@ class trainer():
         self.test_pipe.reset_state()
         self.init_model(mode=0, feed_func=feed_func, gpu_id=self.config['gpu_id'])
         self.train_loop()
-
-    def inference(self, model_path, func, batch_size=None, gpu_id=None, **kwargs):
-        """
-        Restore the model located at model_path 
-        Create the tf sess and model
-        Func must take sess and model as two args
-        Kwargs will be passed to func and which could be None
-        """
-
-        if self.model is None and self.sess is None:
-            self.init_model(mode=1, batch_size=batch_size, gpu_id=gpu_id)
-            _, sess, _ = self.restore(model_path)
-            self.sess = sess
-
-        return func(self.sess, self.model, **kwargs)
-
-    def export(self, model_path, export_path, name, gpu_id='0'):
-
-        self.init_model(mode=2, gpu_id=gpu_id)
-        saver, sess, gpu_id = self.restore(model_path)
-        utils.export_model(saver, sess, export_path, name, gpu_id=gpu_id)
-
-    def restore(self, model_path):
-        """restore the given model"""
-
-        saver        = tf.train.Saver()
-        gpu_options  = tf.GPUOptions(allow_growth=True, visible_device_list='0')
-        config_proto = tf.ConfigProto(gpu_options=gpu_options)
-        serialized   = config_proto.SerializeToString()
-        gpu_id       = list(map(hex, serialized))
-        sess         = tf.Session(config=config_proto)
-        saver.restore(sess, model_path)
-        return saver, sess, gpu_id
