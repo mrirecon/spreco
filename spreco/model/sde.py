@@ -54,12 +54,19 @@ class sde():
         """
         return tf.random.normal(shape, seed=self.seed) * self.sigma_max
 
-    def sigma_t(self, t):
+    def sigma_t(self, t, type='quad'):
         """
         noise schedule for t in (1, 0)
         """
-        #sigma     = self.sigma_min * (self.sigma_max / self.sigma_min)**t
-        sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * t**2
+        #
+        if type == "quad":
+            sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * t**2
+        elif type == "exp":
+            sigma = self.sigma_min * (self.sigma_max / self.sigma_min)**t
+        elif type == 'linear':
+            sigma = self.sigma_min * (self.sigma_max / self.sigma_min) * t
+        else:
+            TypeError("Check you the type of sigma_t!")
         return sigma
     
     def sigmas(self):
@@ -140,14 +147,14 @@ class sde():
             for i in range(self.config['nr_gpu']):
                 with tf.device('/gpu:%d'%i):
                     # train
-                    loss.append(self.loss(self.x[i], self.t[i], denoiser_score=self.config['denoiser_score']))
+                    loss.append(self.loss(self.x[i], self.t[i]))
 
                     gvs = optimizer.compute_gradients(loss[-1], all_params)
                     gvs = [(k, v) for (k, v) in gvs if k is not None]
                     grads.append(gvs)
 
                     # test
-                    loss_test.append(self.loss(self.x[i], self.t[i], denoiser_score=self.config['denoiser_score']))
+                    loss_test.append(self.loss(self.x[i], self.t[i]))
 
             with tf.device('/gpu:0'):
                 for i in range(1, self.config['nr_gpu']):
