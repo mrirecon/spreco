@@ -10,9 +10,11 @@ class sampler():
     when using large skip, it doesn't work
     """
 
-    def __init__(self, config, steps, target_snr, skip=1):
+    def __init__(self, config, target_snr, skip=1):
+        """
+        args for prepare network and computation graph
+        """
         self.config     = config
-        self.steps      = steps
         self.target_snr = target_snr
         self.skip       = skip
     
@@ -28,9 +30,7 @@ class sampler():
         x       = x_mean + G * z
         return [x, x_mean]
 
-    def get_shape(self, samples):
-        return [samples] + self.model.x.shape[1:]
-    
+
     @staticmethod
     def norm(x, axis=(1,2,3)):
         return tf.sqrt(tf.reduce_sum(tf.square(x), axis))
@@ -39,39 +39,50 @@ class sampler():
         """
         langevin corrector
         """
-        for _ in range(self.steps):
-            grad       = self.model.score(x, t)
-            noise      = tf.random.normal(tf.shape(x))
-            grad_norm  = tf.reduce_mean(self.norm(grad))
-            noise_norm = tf.reduce_mean(self.norm(noise))
-            step_size  = (self.target_snr * noise_norm / grad_norm) ** 2 * 2 * 1
-            x_mean     = x + step_size * grad
-            x          = x_mean + noise * tf.sqrt(step_size * 2)
+        grad       = self.model.score(x, t)
+        noise      = tf.random.normal(tf.shape(x))
+        grad_norm  = tf.reduce_mean(self.norm(grad))
+        noise_norm = tf.reduce_mean(self.norm(noise))
+        step_size  = (self.target_snr * noise_norm / grad_norm) ** 2 * 2 * 1
+        x_mean     = x + step_size * grad
+        x          = x_mean + noise * tf.sqrt(step_size * 2)
 
         return [x, x_mean]
 
-    def pc_sampler(self, nr_samples):
+    def an_update(self, x, t):
+        diffusion=self.model.sde(x,t)[1]*self.skip
+        x_mean = x + self.model.score(x, t)*diffusion**2
+        ratio  = self.model.sigma_t(t - self.skip*0.5/self.model.N)/self.model.sigma_t(t + self.skip*0.5/self.model.N)
+        std    = diffusion*ratio[:, tf.newaxis, tf.newaxis, tf.newaxis]
+        x      = x_mean + tf.random.normal(tf.shape(x), seed=self.model.seed)*std
+        return x, x_mean
 
-        x       = self.model.x
-        t       = self.model.t
+    def init_ops(self):
+        self.corrector_op = self.corrector(self.model.x, self.model.t)
+        self.predictor_op = self.predictor(self.model.x, self.model.t)
+        self.an_update_op = self.an_update(self.model.x, self.model.t)
+
+    def get_shape(self, samples):
+        return [samples] + self.model.x.shape[1:]
+    
+    def pc_sampler(self, nr_samples, steps):
 
         x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
         t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
 
-        corrector = self.corrector(x, t)
-        predictor = self.predictor(x, t)
+
         xs        = []
         xs_mean   = []
         for t_i in tqdm.tqdm(t_vals[0::self.skip]):
-            x_val, x_mean = self.sess.run(corrector, {x: x_val, t: [t_i for _ in range(nr_samples)]})
-            x_val, x_mean = self.sess.run(predictor, {x: x_val, t: [t_i for _ in range(nr_samples)]})
+            x_val, x_mean = self.sess.run(self.corrector_op, {self.model.x: x_val, self.model.t: [t_i for _ in range(nr_samples)]})
+            for _ in range(steps):
+                x_val, x_mean = self.sess.run(self.predictor_op, {self.model.x: x_val, self.model.t: [t_i for _ in range(nr_samples)]})
             xs.append(x_val)
             xs_mean.append(x_mean)
         
         return xs, xs_mean
-
-
-    def ancestral_sampler(self, nr_samples):
+    
+    def ancestral_sampler(self, nr_samples, steps):
 
         x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
         t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
@@ -79,27 +90,16 @@ class sampler():
         xs      = []
         xs_mean = []
 
-        def update(x, t):
-
-            diffusion=self.model.sde(x,t)[1]*self.skip
-
-            for _ in range(self.steps):
-                x_mean = x + self.model.score(x, t)*diffusion**2
-                ratio  = self.model.sigma_t(t - self.skip*0.5/self.model.N)/self.model.sigma_t(t + self.skip*0.5/self.model.N)
-                std    = diffusion*ratio[:, tf.newaxis, tf.newaxis, tf.newaxis]
-                x      = x_mean + tf.random.normal(tf.shape(x), seed=self.model.seed)*std
-            return x, x_mean
-
-        update_op = update(self.model.x, self.model.t)
 
         for t_i in tqdm.tqdm(t_vals[0::self.skip]):
-            x_val, x_mean = self.sess.run(update_op, {self.model.x: x_val, self.model.t: [t_i for _ in range(nr_samples)]})
+            for _ in range(steps):
+                x_val, x_mean = self.sess.run(self.an_update_op, {self.model.x: x_val, self.model.t: [t_i for _ in range(nr_samples)]})
             xs.append(x_val)
             xs_mean.append(x_mean)
 
         return xs, xs_mean
 
-    def init_model(self, model_path, gpu_id=None, seed=None):
+    def init_sampler(self, model_path, gpu_id=None, seed=None):
         
         if seed is not None:
             tf.random.set_random_seed(seed)
@@ -121,6 +121,7 @@ class sampler():
         self.model = selected_class(self.config)
 
         self.model.init(mode=1, batch_size=None)
+        self.init_ops()
 
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
         if gpu_id is None:
