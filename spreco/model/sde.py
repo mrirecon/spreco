@@ -129,8 +129,10 @@ class sde():
 
         return loss
     
-    def init(self, mode=0):
+    def init(self, mode=0, batch_size=None):
 
+        if batch_size is not None:
+                self.config['batch_size'] = batch_size
         self.init_placeholder(mode)
 
         if mode == 0:
