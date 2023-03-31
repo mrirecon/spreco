@@ -26,7 +26,7 @@ class sde():
 
         self.seed         = config['seed']
 
-    def init_placeholder(self, mode=0):
+    def init_placeholder(self, mode=0, batch_size=None):
 
         if mode == 0:
             # training
@@ -40,8 +40,8 @@ class sde():
 
         if mode == 1:
             # inference
-            self.x = tf.placeholder(tf.float32, shape=[self.config['batch_size']]+self.config['input_shape'])
-            self.t = tf.placeholder(tf.float32, shape=[self.config['batch_size']])
+            self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'])
+            self.t = tf.placeholder(tf.float32, shape=[batch_size])
 
         if mode == 2:
             # exporting
@@ -110,8 +110,8 @@ class sde():
     def loss(self, x, t, likelihood_weighting=False):
         """
         """
-        shape = x.shape
-        z = tf.random.normal(shape, seed=self.seed)
+
+        z = tf.random.normal(tf.shape(x), seed=self.seed)
 
         std       = self.sigma_t(t)[:, tf.newaxis, tf.newaxis, tf.newaxis]
         x_t       = x +  std * z
@@ -131,9 +131,7 @@ class sde():
     
     def init(self, mode=0, batch_size=None):
 
-        if batch_size is not None:
-                self.config['batch_size'] = batch_size
-        self.init_placeholder(mode)
+        self.init_placeholder(mode, batch_size)
 
         if mode == 0:
 
