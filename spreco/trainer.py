@@ -20,21 +20,18 @@ class trainer():
         self.train_pipe = train_pipe
         self.test_pipe  = test_pipe
         self.config     = config
-
-        if train_pipe is not None:
-            self.log_path   = utils.create_folder(config['log_folder'])
-            utils.save_config(config, self.log_path)
-            self.logger = tb_logger(self.log_path)
-
         self.model      = None
-        self.sess       = None
 
         self.global_step  = 0
         self.epoch        = 0
         self.default_feed = default_feed
 
+        self.log_path = utils.create_folder(config['log_folder'])
+        self.logger   = tb_logger(self.log_path)
 
-    def init_model(self, mode, feed_func=None, gpu_id=None, restore=False):
+        utils.save_config(config, self.log_path)
+
+    def init_model(self, feed_func=None, gpu_id=None):
         
         if self.config['model'] == MODELS.NCSN:
             tf.random.set_random_seed(self.config['seed'])
@@ -49,13 +46,12 @@ class trainer():
         else:
             raise Exception("Currently, this model is not implemented!")
 
-        if mode == 0:
-            self.lr_scheduler = LambdaWarmUpCosineScheduler(self.config['lr_warm_up_steps'],
+        self.lr_scheduler = LambdaWarmUpCosineScheduler(self.config['lr_warm_up_steps'],
                                 self.config['lr_min'], self.config['lr_max'], self.config['lr_start'], self.config['lr_max_decay_steps'])
 
         self.model = selected_class(self.config)
 
-        self.model.init(mode)
+        self.model.init(mode=0)
         if not self.default_feed:
             self.feed_func=feed_func
 
@@ -137,6 +133,11 @@ class trainer():
         sess       = tf.Session(config=gpu_config)
         sess.run(init_op)
 
+        if "restore_path" in self.config.keys():
+            saver.restore(sess, self.config['restore_path'])
+            info = [utils.get_timestamp() + ", the training session was restored from %s"%self.config['restore_path']]
+            utils.log_to(os.path.join(self.log_path, 'train_info'), info, prefix="")
+
         utils.print_parameters(self.log_path+'/layer_info')
 
         for epoch in range(self.config['max_epochs']):
@@ -194,5 +195,5 @@ class trainer():
     def train(self, feed_func=None):
         self.train_pipe.reset_state()
         self.test_pipe.reset_state()
-        self.init_model(mode=0, feed_func=feed_func, gpu_id=self.config['gpu_id'])
+        self.init_model(feed_func=feed_func, gpu_id=self.config['gpu_id'])
         self.train_loop()
