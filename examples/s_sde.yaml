@@ -1,0 +1,10 @@
+log_folder: /home/gluo/workspace/nlinv_prior/logs/20230331-115637
+model_name: sde_abide_500
+
+gpu_id: '2'
+
+nr_samples: 50
+target_snr: 0.15
+skip: 1
+steps_pc: 2
+steps_an: 1
