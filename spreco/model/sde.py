@@ -54,58 +54,58 @@ class sde():
         """
         return tf.random.normal(shape, seed=self.seed) * self.sigma_max
 
-    def sigma_t(self, t, type='quad'):
+    def sigma_t(self, t, typ='quad'):
         """
         noise schedule for t in (1, 0)
         """
         #
-        if type == "quad":
+        if typ == "quad":
             sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * t**2
-        elif type == "exp":
+        elif typ == "exp":
             sigma = self.sigma_min * (self.sigma_max / self.sigma_min)**t
-        elif type == 'linear':
-            sigma = self.sigma_min * (self.sigma_max / self.sigma_min) * t
+        elif typ == 'linear':
+            sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * t
         else:
             TypeError("Check you the type of sigma_t!")
         return sigma
     
-    def sigmas(self):
-        return self.sigma_t(tf.linspace(self.T, self.eps, self.N+1))
+    def sigmas(self, typ='quad'):
+        return self.sigma_t(tf.linspace(self.T, self.eps, self.N+1), typ)
 
-    def sde(self, x, t):
+    def sde(self, x, t, typ='quad'):
 
         drift     = tf.zeros_like(x)
-        diffusion = tf.sqrt(tf.gradients(tf.math.square(self.sigma_t(t)), t)[0]/self.N)
+        diffusion = tf.sqrt(tf.gradients(tf.math.square(self.sigma_t(t, typ)), t)[0]/self.N)
 
         return drift, diffusion[:, tf.newaxis, tf.newaxis, tf.newaxis]
 
-    def reverse_sde(self, x, t):
+    def reverse_sde(self, x, t, typ='quad'):
         
-        drift, diffusion = self.sde(x, t)
-        score = self.score(x, t)
+        drift, diffusion = self.sde(x, t, typ)
+        score = self.score(x, t, typ)
         drift = drift - diffusion ** 2 * score
 
         return drift, diffusion
 
-    def discretize(self, x, t):
+    def discretize(self, x, t, typ='quad'):
 
         timestep  = tf.cast((1. - t / self.T) * self.N, tf.int32)
-        sigma     = tf.gather(self.sigmas(), timestep)
-        adj_sigma = tf.gather(self.sigmas(), timestep + 1)
+        sigma     = tf.gather(self.sigmas(typ), timestep)
+        adj_sigma = tf.gather(self.sigmas(typ), timestep + 1)
 
         f         = tf.zeros_like(x)
         g         = tf.sqrt(sigma ** 2 - adj_sigma ** 2)
 
         return f, g[:, tf.newaxis, tf.newaxis, tf.newaxis]
 
-    def reverse_discrete(self, x, t):
-        f, G  = self.discretize(x, t)
-        rev_f = f - G ** 2 * self.score(x, t)
+    def reverse_discrete(self, x, t, typ='quad'):
+        f, G  = self.discretize(x, t, typ)
+        rev_f = f - G ** 2 * self.score(x, t, typ)
         rev_g = G 
         return rev_f, rev_g
 
-    def score(self, x_t, t):
-        return self.net.forward(x_t, self.sigma_t(t))
+    def score(self, x_t, t, typ='quad'):
+        return self.net.forward(x_t, self.sigma_t(t, typ))
 
     def loss(self, x, t, likelihood_weighting=False):
         """
@@ -113,9 +113,9 @@ class sde():
 
         z = tf.random.normal(tf.shape(x), seed=self.seed)
 
-        std       = self.sigma_t(t)[:, tf.newaxis, tf.newaxis, tf.newaxis]
+        std       = self.sigma_t(t, self.config['s_type'])[:, tf.newaxis, tf.newaxis, tf.newaxis]
         x_t       = x +  std * z
-        score     = self.score(x_t, t)
+        score     = self.score(x_t, t, self.config['s_type'])
 
         reduce    = lambda tmp: tf.reduce_mean(tmp, axis=[1,2,3]) if self.config['reduce_mean'] else tf.reduce_sum(tmp, axis=[1,2,3])
 
