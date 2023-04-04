@@ -129,8 +129,9 @@ class trainer():
         # ready to go
         init_op    = tf.global_variables_initializer()
         saver      = tf.train.Saver(max_to_keep=self.config['max_keep'])
-        gpu_config = tf.ConfigProto(allow_soft_placement=True)
-        sess       = tf.Session(config=gpu_config)
+        gpu_config = tf.ConfigProto()
+        gpu_config.gpu_options.allow_growth=True
+        sess = tf.Session(config=gpu_config)
         sess.run(init_op)
 
         if "restore_path" in self.config.keys():
