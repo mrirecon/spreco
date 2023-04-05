@@ -12,15 +12,16 @@ class sampler():
     [config['sigma_min'], config['simga_max']] is the range for the score network can handle
     """
 
-    def __init__(self, config, target_snr, sigma_type='exp', N=100, cond_func=None):
+    def __init__(self, config, target_snr, sigma_type='exp', N=100, T=None, cond_func=None):
         """
         args for prepare network and computation graph
         """
         self.config      = config
         self.target_snr  = target_snr
-        self.cond_func   = cond_func
         self.sigma_type  = sigma_type
         self.config['N'] = N
+        self.T           = T
+        self.cond_func   = cond_func
     
     def predictor(self, x, t):
         """
@@ -65,16 +66,16 @@ class sampler():
         self.corrector_op = self.corrector(self.model.x, self.model.t)
         self.predictor_op = self.predictor(self.model.x, self.model.t)
         self.an_update_op = self.an_update(self.model.x, self.model.t)
-        if self.cond_func is not None:
-            self.sig_op = self.model.sigma_t(self.model.t, self.sigma_type)
+        self.sig_op = self.model.sigma_t(self.model.t, self.sigma_type)
 
     def get_shape(self, samples):
         return [samples] + self.model.x.shape[1:]
     
     def pc_sampler(self, nr_samples, steps):
 
+        t_vals    = np.linspace(self.model.T if self.T is None else self.T, self.model.eps, self.model.N)
         x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
-        t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
+        x_val     = x_val /self.config['sigma_max']*self.sess.run(self.sig_op, {self.model.t: [t_vals[0]]})
 
 
         xs        = []
@@ -97,8 +98,9 @@ class sampler():
     
     def ancestral_sampler(self, nr_samples, steps):
 
+        t_vals    = np.linspace(self.model.T if self.T is None else self.T, self.model.eps, self.model.N)
         x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
-        t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
+        x_val     = x_val/self.config['sigma_max']*self.sess.run(self.sig_op, {self.model.t: [t_vals[0]]})
 
         xs      = []
         xs_mean = []
