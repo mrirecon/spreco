@@ -12,15 +12,13 @@ class sampler():
     [config['sigma_min'], config['simga_max']] is the range for the score network can handle
     """
 
-    def __init__(self, config, target_snr, sigma_type='exp', N=100, T=None, cond_func=None):
+    def __init__(self, config, target_snr, sigma_type='exp', cond_func=None):
         """
         args for prepare network and computation graph
         """
         self.config      = config
         self.target_snr  = target_snr
         self.sigma_type  = sigma_type
-        self.config['N'] = N
-        self.T           = T
         self.cond_func   = cond_func
     
     def predictor(self, x, t):
@@ -73,9 +71,8 @@ class sampler():
     
     def pc_sampler(self, nr_samples, steps):
 
-        t_vals    = np.linspace(self.model.T if self.T is None else self.T, self.model.eps, self.model.N)
+        t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
         x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
-        x_val     = x_val /self.config['sigma_max']*self.sess.run(self.sig_op, {self.model.t: [t_vals[0]]})
 
 
         xs        = []
@@ -98,9 +95,8 @@ class sampler():
     
     def ancestral_sampler(self, nr_samples, steps):
 
-        t_vals    = np.linspace(self.model.T if self.T is None else self.T, self.model.eps, self.model.N)
+        t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
         x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
-        x_val     = x_val/self.config['sigma_max']*self.sess.run(self.sig_op, {self.model.t: [t_vals[0]]})
 
         xs      = []
         xs_mean = []
