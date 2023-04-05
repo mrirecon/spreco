@@ -45,8 +45,8 @@ class sde():
 
         if mode == 2:
             # exporting
-            self.x = tf.placeholder(tf.float32, shape=[self.config['batch_size']]+self.config['input_shape'], name="input_0")
-            self.t = tf.placeholder(tf.int32, shape=[self.config['batch_size']], name="input_1")
+            self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'], name="input_0")
+            self.t = tf.placeholder(tf.float32, shape=[batch_size], name="input_1")
 
     def prior_sampling(self, shape):
         """
@@ -174,6 +174,8 @@ class sde():
 
         elif mode == 2:
             _  = self.loss(self.x, self.t)
+            diffusion=self.sde(self.x, self.t, self.config['sigma_type'])[1]
+            self.default_out = self.score(self.x, self.t, self.config['sigma_type']) * diffusion**2
 
         else:
             raise ValueError("Value for mode selection is wrong, only 0,1,2 are valid.")
