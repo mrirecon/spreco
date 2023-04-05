@@ -14,7 +14,9 @@ config     = utils.load_config(s_config['log_folder']+'/config.yaml')
 save_path  = utils.create_folder(eval_path(s_config['log_folder'], 'samples'))
 utils.save_config(s_config, save_path)
 
-a_sampler = sampler(config, target_snr=s_config['target_snr'], skip=s_config['skip'])
+print("INFO -> Sigma max: %.4f, simga min: %.4f, discrete steps: %d type: %s"%(config['sigma_max'], config['sigma_min'], s_config['N'], s_config['sigma_type']))
+a_sampler = sampler(config, s_config['target_snr'], s_config['sigma_type'], s_config['N'])
+
 a_sampler.init_sampler(model_path, gpu_id=s_config['gpu_id'])
 
 image_n, image  = a_sampler.pc_sampler(s_config['nr_samples'], s_config['steps_pc'])
