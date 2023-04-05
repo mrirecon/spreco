@@ -95,9 +95,9 @@ def main(config_path):
         # x is a dummy arg
         return np.random.randint(0, config['nr_levels'], (1), dtype=dtype)
 
-    def randfloat(x, eps= 1.e-5, T= 1.):
+    def randfloat(x):
         # x is a dummy arg
-        return np.random.uniform(eps, T, size=(1))
+        return np.random.uniform(config['sigma_min'], config['sigma_max'], size=(1))
 
     if config['model'] == 'NCSN':
         def map_f(x):
