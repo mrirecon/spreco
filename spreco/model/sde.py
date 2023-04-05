@@ -15,9 +15,9 @@ class sde():
         self.config    = config
         self.sigma_min = config['sigma_min']
         self.sigma_max = config['sigma_max']
-        self.N         = config['N']
+        self.N         = 100 if 'N' not in  config.keys() else config['N']
         self.T         = 1.
-        self.eps       = config['eps']
+        self.eps       = 1.e-5
 
         if 'scale_out' in self.config.keys():
             self.net = cond_refine_net_plus(config, scale_out=self.config['scale_out'])
@@ -66,7 +66,7 @@ class sde():
         elif typ == 'linear':
             sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * t
         else:
-            TypeError("Check you the type of sigma_t!")
+            raise TypeError("Check you the type of sigma_t!")
         return sigma
     
     def sigmas(self, typ='quad'):
@@ -109,13 +109,15 @@ class sde():
 
     def loss(self, x, t, likelihood_weighting=False):
         """
+        x is perturb image
+        t is the sigma used to perturb image
         """
 
         z = tf.random.normal(tf.shape(x), seed=self.seed)
 
-        std       = self.sigma_t(t, self.config['s_type'])[:, tf.newaxis, tf.newaxis, tf.newaxis]
+        std       = t[:, tf.newaxis, tf.newaxis, tf.newaxis]
         x_t       = x +  std * z
-        score     = self.score(x_t, t, self.config['s_type'])
+        score     = self.net.forward(x_t, t)
 
         reduce    = lambda tmp: tf.reduce_mean(tmp, axis=[1,2,3]) if self.config['reduce_mean'] else tf.reduce_sum(tmp, axis=[1,2,3])
 
