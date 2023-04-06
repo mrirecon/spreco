@@ -96,6 +96,9 @@ def cond_res_block(x, h, out_filters, nonlinearity, normalizer, rescale=False, *
     x = normalizer(x)
     x = nonlinearity(x)
 
+    if 'dropout' in kwargs.keys() and kwargs['dropout'] > 0:
+        x = tf.nn.dropout(x)
+
     x = nn.conv2d_plus(x, out_filters, nonlinearity=None, scope='cond_res', **kwargs)
     if 'dilation' not in kwargs.keys() and rescale:
         x = tf.nn.avg_pool2d(x, ksize=(1,2,2,1), strides=(1,2,2,1), padding='SAME')
@@ -130,6 +133,7 @@ class cond_refine_net_plus():
         self.affine_x      = config['affine_x']
         self.fourier_scale = config['fourier_scale']
         self.attention     = config['attention']
+        self.dropout       = 0. if 'dropout' not in config.keys() else config['dropout']
         self.scale_out     = scale_out
         if config['body'] == 'small':
             self.forward       = tf.make_template('forward', self.small_body)
