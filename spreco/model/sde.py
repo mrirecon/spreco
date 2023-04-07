@@ -43,10 +43,6 @@ class sde():
             self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'])
             self.t = tf.placeholder(tf.float32, shape=[batch_size])
 
-        if mode == 2:
-            # exporting
-            self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'], name="input_0")
-            self.t = tf.placeholder(tf.float32, shape=[batch_size], name="input_1")
 
     def prior_sampling(self, shape):
         """
@@ -135,7 +131,7 @@ class sde():
 
         return loss
     
-    def init(self, mode=0, batch_size=None):
+    def init(self, mode=0, batch_size=None, **kwargs):
 
         self.init_placeholder(mode, batch_size)
 
@@ -177,9 +173,16 @@ class sde():
             _  = self.loss(self.x, self.t)
 
         elif mode == 2:
-            _  = self.loss(self.x, self.t)
-            diffusion=self.sde(self.x, self.t, self.config['sigma_type'])[1]
-            self.default_out = self.score(self.x, self.t, self.config['sigma_type']) * diffusion**2
+
+            if 'default_out' in kwargs.keys() and kwargs['default_out']:
+                print("Customized inputs and outputs")
+            else:
+                self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'], name="input_0")
+                self.t = tf.placeholder(tf.float32, shape=[batch_size], name="input_1")
+                diffusion=self.sde(self.x, self.t, self.config['sigma_type'])[1]
+                self.default_out = self.score(self.x, self.t, self.config['sigma_type']) * diffusion**2
+                _  = self.loss(self.x, self.t)
+
 
         else:
-            raise ValueError("Value for mode selection is wrong, only 0,1,2 are valid.")
+            raise ValueError("Values 0,1,2 for mode are valid.")
