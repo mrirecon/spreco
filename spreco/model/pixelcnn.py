@@ -5,6 +5,8 @@ from spreco.common.options import DATA_CHNS
 
 import numpy as np
 from tf_slim import arg_scope
+from functools import partial
+
 import tensorflow.compat.v1 as tf
 tf.disable_eager_execution()
 
@@ -32,7 +34,7 @@ class pixelcnn():
             else:
                 self.ins_outs     = {'inputs': self.x}
 
-        elif mode == 1:
+        if mode == 1:
             # inferencing
             self.x  = tf.placeholder(tf.float32, shape=[self.config['batch_size']]+self.config['input_shape']) 
 
@@ -41,16 +43,8 @@ class pixelcnn():
             else:
                 self.t = None
 
-        elif mode == 2:
-            # exporting
-            self.x  = tf.placeholder(tf.float32, shape=[self.config['batch_size']]+self.config['input_shape'], name='input_0')
-            #self.x  = tf.transpose(self.x, [0, 2, 1, 3])
-            if self.config['conditional']:
-                self.t = tf.placeholder(tf.float32, shape=[self.config['batch_size']], name='input_1')
-            else:
-                self.t = None
 
-    def init(self, mode=0):
+    def init(self, mode=0, **kwargs):
 
         model_opt = {'nr_resnet': self.config['nr_resnet'],
                      'nr_filters': self.config['nr_filters'],
@@ -123,16 +117,26 @@ class pixelcnn():
             self.grads = tf.squeeze(tf.gradients(self.loss, self.x), name='grad_0') 
         
         elif mode == 2:
-            init_pass = self.forward(self.x, init=True, dropout_p=0., **model_opt) 
-            self.out = self.forward(self.x, dropout_p=0., **model_opt)
 
-            loss = loss_func(self.x, self.out)
-            loss = loss/(np.log(2.0)*np.prod(self.config['input_shape'])*1)
+            print('INFO -> Exporting PIXELCNN model')  #TODO choose loss func here!
 
-            output = tf.identity(tf.stack([loss, tf.zeros_like(loss)], axis=-1), name='output_0')
-            self.grads = tf.squeeze(tf.gradients(loss, self.x), name='grad_0') 
-            #self.grads = tf.transpose(self.grads, [1, 0, 2], name='grad_0')
-            grad_ys = tf.placeholder(tf.float32, shape=[2], name='grad_ys_0')
+            if 'default_out' in kwargs.keys() and kwargs['default_out'] == False:
+                print("INFO -> Customizing tf inputs and outputs")
+                self.eval      = partial(self.forward, dropout_p=0., **model_opt)
+                self.loss_func = loss_func
+            else:
+                #TODO: might not work
+                self.x = tf.placeholder(tf.float32, shape=[None]+self.config['input_shape'], name="input_0")
+
+                _        = self.forward(self.x, init=True, dropout_p=0., **model_opt) 
+                self.out = self.forward(self.x, dropout_p=0., **model_opt)
+
+                loss = loss_func(self.x, self.out)
+                loss = loss/(np.log(2.0)*np.prod(self.config['input_shape'])*1)
+
+                output = tf.identity(tf.stack([loss, tf.zeros_like(loss)], axis=-1), name='output_0')
+                self.grads = tf.squeeze(tf.gradients(loss, self.x), name='grad_0') 
+                grad_ys = tf.placeholder(tf.float32, shape=[2], name='grad_ys_0')
 
 
     @staticmethod
