@@ -12,8 +12,6 @@ s_config = utils.load_config(sys.argv[1])
 
 model_path = evalpath(s_config['log_folder'], s_config['model_name'])
 config     = utils.load_config(s_config['log_folder']+'/config.yaml')
-save_path  = utils.create_folder(evalpath(s_config['log_folder'], 'samples'))
-utils.save_config(s_config, save_path)
 
 def check_paras(m_config, n_config):
     """
@@ -36,6 +34,9 @@ def check_paras(m_config, n_config):
     return m_config
 
 check_paras(config, s_config)
+
+save_path  = utils.create_folder(evalpath(s_config['log_folder'], 'samples'))
+utils.save_config(s_config, save_path)
 
 print("INFO -> sigma type: %s, sigma max: %.4f, simga min: %.4f, discrete steps: %d "
       %(s_config['sigma_type'], s_config['sigma_max'], s_config['sigma_min'], s_config['N']))
