@@ -2,7 +2,7 @@ import tensorflow.compat.v1 as tf
 tf.disable_eager_execution()
 
 def int_shape(x):
-    shape = x.get_shape()
+    shape = x.shape
     if None in shape:
         return shape
     else:
