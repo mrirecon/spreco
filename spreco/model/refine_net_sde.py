@@ -96,8 +96,8 @@ def cond_res_block(x, h, out_filters, nonlinearity, normalizer, rescale=False, *
     x = normalizer(x)
     x = nonlinearity(x)
 
-    if 'dropout' in kwargs.keys() and kwargs['dropout'] > 0:
-        x = tf.nn.dropout(x)
+    if 'dropout' in kwargs.keys() and kwargs['dropout'] > 0.0:
+        x = tf.nn.dropout(x, rate=kwargs['dropout'], name='dropout_conv')
 
     x = nn.conv2d_plus(x, out_filters, nonlinearity=None, scope='cond_res', **kwargs)
     if 'dilation' not in kwargs.keys() and rescale:
@@ -113,7 +113,10 @@ def cond_res_block(x, h, out_filters, nonlinearity, normalizer, rescale=False, *
             shortcut = nn.conv2d_plus(x_skip, out_filters)
 
     if h is not None:
-        shortcut = shortcut + tf.expand_dims(tf.expand_dims(nn.nin(h, out_filters), 1), 1)
+        h = nn.nin(h, out_filters)
+        if 'dropout' in kwargs.keys() and kwargs['dropout'] > 0.0:
+            h = tf.nn.dropout(h, rate=kwargs['dropout'], name='dropout_nin')
+        shortcut = shortcut + tf.expand_dims(tf.expand_dims(h, 1), 1)
 
     return shortcut + x
 
@@ -152,7 +155,7 @@ class cond_refine_net_plus():
             x = 2*x - 1
         
         with arg_scope([nn.conv2d_plus, nn.embed_t, nn.nin, cond_refine_block, cond_crp_block, cond_rcu_block, cond_msf_block, cond_res_block,nn.self_attention, nn.instance_norm_plus],
-                                 nonlinearity=self.nonlinearity, counters=self.counters, normalizer=self.normalizer):
+                                 nonlinearity=self.nonlinearity, counters=self.counters, normalizer=self.normalizer, dropout=self.dropout):
             
             proj_t = nn.embed_t(tf.math.log(t), embedding_size=self.nr_filters, scale=self.fourier_scale)
 
@@ -207,7 +210,7 @@ class cond_refine_net_plus():
             x = 2*x - 1
         
         with arg_scope([nn.conv2d_plus, nn.embed_t, nn.nin, cond_refine_block, cond_crp_block, cond_rcu_block, cond_msf_block, cond_res_block, nn.instance_norm_plus],
-                                 nonlinearity=self.nonlinearity, counters=self.counters, normalizer=self.normalizer):
+                                 nonlinearity=self.nonlinearity, counters=self.counters, normalizer=self.normalizer, dropout=self.dropout):
             
             proj_t = nn.embed_t(tf.math.log(t), embedding_size=self.nr_filters, scale=self.fourier_scale)
 
@@ -247,7 +250,7 @@ class cond_refine_net_plus():
             x = 2*x - 1
         
         with arg_scope([nn.conv2d_plus, nn.embed_t, nn.nin, cond_refine_block, cond_crp_block, cond_rcu_block, cond_msf_block, cond_res_block,nn.self_attention, nn.instance_norm_plus],
-                                 nonlinearity=self.nonlinearity, counters=self.counters, normalizer=self.normalizer):
+                                 nonlinearity=self.nonlinearity, counters=self.counters, normalizer=self.normalizer, dropout=self.dropout):
             
             proj_t = nn.embed_t(tf.math.log(t), embedding_size=self.nr_filters, scale=self.fourier_scale)
 
