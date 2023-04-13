@@ -64,7 +64,7 @@ class sampler():
         self.corrector_op = self.corrector(self.model.x, self.model.t)
         self.predictor_op = self.predictor(self.model.x, self.model.t)
         self.an_update_op = self.an_update(self.model.x, self.model.t)
-        self.sig_op = self.model.sigma_t(self.model.t, self.sigma_type)
+        self.sig_op = self.model.sde(self.model.x, self.model.t, self.sigma_type)[1]
 
     def get_shape(self, samples):
         return [samples] + self.model.x.shape[1:]
@@ -109,7 +109,6 @@ class sampler():
                 if self.cond_func is not None:
                     sig = self.sess.run(self.sig_op, {self.model.t: [t_i]})
                     x_val = self.cond_func(x_val, sig)
-                    x_mean = self.cond_func(x_mean, sig)
 
             xs.append(x_val)
             xs_mean.append(x_mean)
