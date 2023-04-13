@@ -62,7 +62,7 @@ class sde():
         elif typ == 'linear':
             sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * t
         elif typ == 'log':
-            sigma = self.sigma_min +self.sigma_max*tf.math.log((tf.math.exp(1.)-1.)*t + 1.)
+            sigma = self.sigma_min +self.sigma_max*tf.math.log((tf.math.exp(1.)-1.)*t + 1.) # TODO (sigma_max-sigma_min)
         elif typ == 'sqrt':
             sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * t**0.5
         else:
@@ -107,13 +107,38 @@ class sde():
     def score(self, x_t, t, typ='quad'):
         return self.net.forward(x_t, self.sigma_t(t, typ))
 
-    def loss(self, x, t, likelihood_weighting=False):
+    def map_sigma(self, sigma, map='exp'):
+        """
+        function to adjust the density of sigma by select map function during the training
+        """
+        range  = (self.sigma_max-self.sigma_min)
+        sigma_r = (sigma-self.sigma_min)/range
+
+        if map == 'cubic':
+            m_sigma = self.sigma_min + range*(sigma_r**3)
+        elif map == 'quad':
+            m_sigma = self.sigma_min + range*(sigma_r**2)
+        elif map == 'linear':
+            m_sigma = sigma
+        elif map == 'quat':
+            m_sigma = self.sigma_min + range*(sigma_r**4)
+        elif map == 'log':
+            m_sigma = self.sigma_min + range*tf.math.log((tf.math.exp(1.)-1.)*(sigma_r) + 1.)
+        elif map == 'exp':
+            m_sigma = self.sigma_min * (self.sigma_max / self.sigma_min)**sigma_r
+        else:
+            raise TypeError("Check you the type of map function!")
+        return m_sigma
+
+
+    def loss(self, x, t, weighting=False):
         """
         x is perturb image
         t is the sigma used to perturb image
         """
 
         z = tf.random.normal(tf.shape(x), seed=self.seed)
+        t = self.map_sigma(t)
 
         std       = t[:, tf.newaxis, tf.newaxis, tf.newaxis]
         x_t       = x +  std * z
@@ -121,11 +146,11 @@ class sde():
 
         reduce    = lambda tmp: tf.reduce_mean(tmp, axis=[1,2,3]) if self.config['reduce_mean'] else tf.reduce_sum(tmp, axis=[1,2,3])
 
-        if not likelihood_weighting:
-            loss = reduce(tf.math.square(score * std + z))
-        else:
-            loss = reduce(tf.math.square(score + z/std))
-            loss = loss * std ** 2
+        loss = reduce(tf.math.square(score * std + z))
+        #loss = reduce(tf.math.square(score + z/std))
+        
+        if weighting:
+            loss = loss / std
 
         loss = tf.reduce_mean(loss)
 
@@ -170,12 +195,23 @@ class sde():
             self.loss_test  = loss_test[0]/self.config['nr_gpu']
 
         elif mode == 1:
+            self.net.dropout = 0.0
             _  = self.loss(self.x, self.t)
 
         elif mode == 2:
 
-            if 'default_out' in kwargs.keys() and kwargs['default_out']:
-                print("Customized inputs and outputs")
+            self.net.dropout = 0.0
+
+            if 'sigma_type' in kwargs.keys() and kwargs['sigma_type'] is not None:
+                self.config['sigma_type'] = kwargs['sigma_type']
+            else:
+                self.config['sigma_type'] = 'linear'
+
+            print('INFO -> Exporting diffusion model with %s noise schedule'%self.config['sigma_type'])
+
+            if 'default_out' in kwargs.keys() and kwargs['default_out'] == False:
+                print("INFO -> Customizing tf inputs and outputs")
+                
             else:
                 self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'], name="input_0")
                 self.t = tf.placeholder(tf.float32, shape=[batch_size], name="input_1")
@@ -185,4 +221,4 @@ class sde():
 
 
         else:
-            raise ValueError("Values 0,1,2 for mode are valid.")
+            raise ValueError("Only the value from 0,1,2 for mode are valid.")
