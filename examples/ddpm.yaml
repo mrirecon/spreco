@@ -1,19 +1,19 @@
-## model
-model: "SDE"
-batch_size: 5
+## DDPM
+model: "SDE2"
+batch_size: 10
 input_shape: [256, 256, 2]
-data_chns: 'CPLX'
+data_chns: 2
 
-sigma_max: 5.
-sigma_min: 0.005
-N: 100
+beta_max: 20.
+beta_min: 0.1
+N: 1000
 eps: 1.e-5
 reduce_mean: True
 
 lr_warm_up_steps: 1000
-lr_start: 0.0001
-lr_min: 0.0001
-lr_max: 0.0001
+lr_start: 0.0003
+lr_min: 0.0003
+lr_max: 0.0003
 lr_max_decay_steps: 2000
 
 
@@ -24,14 +24,13 @@ nr_filters: 64
 nonlinearity: 'elu'
 fourier_scale: 16
 affine_x: False
-attention: True
+attention: False
 
 max_keep: 100
-max_epochs: 500
+max_epochs: 3000
 save_interval: 50
-saved_name: sde_abide
+saved_name: ddpm_hku
 log_folder: /home/gluo/workspace/nlinv_prior/logs
-restore_path: /home/gluo/workspace/nlinv_prior/logs/20230330-115026/sde_abide_1000
 
 num_thread: 30
 print_loss: True
@@ -39,4 +38,4 @@ train_list: /home/gluo/workspace/nlinv_prior/data/hku/hku_train
 test_list: /home/gluo/workspace/nlinv_prior/data/hku/hku_test
 
 nr_gpu: 2
-gpu_id: '2,3'
+gpu_id: '1,2'

@@ -1,0 +1,40 @@
+## SMLD
+model: "SDE"
+batch_size: 15
+input_shape: [256, 256, 2]
+data_chns: 'CPLX'
+
+sigma_max: 5.
+sigma_min: 0.005
+reduce_mean: True
+
+lr_warm_up_steps: 100
+lr_start: 0.0001
+lr_min: 0.0003
+lr_max: 0.0005
+lr_max_decay_steps: 200
+
+
+seed: 1234
+net: 'refine'
+body: small
+nr_filters: 64
+nonlinearity: 'elu'
+fourier_scale: 16
+affine_x: False
+attention: True
+
+max_keep: 100
+max_epochs: 2000
+save_interval: 50
+saved_name: smld
+log_folder: /home/gluo/workspace/nlinv_prior/logs
+#restore_path: /home/gluo/workspace/nlinv_prior/logs/20230410-093726/sde_hku_1000
+
+num_thread: 30
+print_loss: true
+train_list: /home/gluo/workspace/nlinv_prior/data/hku/hku_train
+test_list: /home/gluo/workspace/nlinv_prior/data/hku/hku_test
+
+nr_gpu: 2
+gpu_id: '1,2'
