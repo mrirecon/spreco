@@ -6,8 +6,8 @@ import tensorflow.compat.v1 as tf
 
 class sde():
     """
-    class for a diffusion model formulated with stochastic diffusion equation
-    Refs: arXiv 2006.11239 (Ho Jonathan); ICLR2021 (Song Yang)
+    Variance exploded diffusion model
+    Ref: ICLR2021 (Song Yang) --> SMLD
     """
 
     def __init__(self, config): 
@@ -25,6 +25,7 @@ class sde():
             self.net = cond_refine_net_plus(config)
 
         self.seed         = config['seed']
+        self.type         = 'SMLD'
 
     def init_placeholder(self, mode=0, batch_size=None):
 
@@ -79,10 +80,13 @@ class sde():
 
         return drift, diffusion[:, tf.newaxis, tf.newaxis, tf.newaxis]
 
-    def reverse_sde(self, x, t, typ='quad'):
+    def reverse_sde(self, x, t, typ='quad', ode=False):
         
         drift, diffusion = self.sde(x, t, typ)
-        score = self.score(x, t, typ)
+        if ode:
+            score = 0.5*self.score(x, t, typ)
+        else:
+            score = self.score(x, t, typ)
         drift = drift - diffusion ** 2 * score
 
         return drift, diffusion
@@ -133,28 +137,28 @@ class sde():
 
     def loss(self, x, t, weighting=False):
         """
-        x is perturb image
+        x is the clean image from a dataset
         t is the sigma used to perturb image
         """
 
-        z = tf.random.normal(tf.shape(x), seed=self.seed)
-        t = self.map_sigma(t)
+        z = tf.random.normal(tf.shape(x))
+        sigma = self.map_sigma(t)
 
-        std       = t[:, tf.newaxis, tf.newaxis, tf.newaxis]
+        std       = sigma[:, tf.newaxis, tf.newaxis, tf.newaxis]
         x_t       = x +  std * z
-        score     = self.net.forward(x_t, t)
+        score     = self.net.forward(x_t, sigma)
 
         reduce    = lambda tmp: tf.reduce_mean(tmp, axis=[1,2,3]) if self.config['reduce_mean'] else tf.reduce_sum(tmp, axis=[1,2,3])
 
-        loss = reduce(tf.math.square(score * std + z))
+        l = reduce(tf.math.square(score * std + z))
         #loss = reduce(tf.math.square(score + z/std))
         
         if weighting:
-            loss = loss / std
+            l = l / std
 
-        loss = tf.reduce_mean(loss)
+        l = tf.reduce_mean(l)
 
-        return loss
+        return l
     
     def init(self, mode=0, batch_size=None, **kwargs):
 
