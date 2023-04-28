@@ -53,7 +53,10 @@ def cond_msf_block(blocks, nr_filters, out_shape, normalizer, **kwargs):
         if nr_filters is None:
             nr_filters = nn.int_shape(blocks[i])[-1]
         xl_out = nn.conv2d_plus(xl_out, nr_filters, nonlinearity=None, scope='cond_msf')
-        xl_out = tf.image.resize(xl_out, out_shape, method='bilinear')
+        if 'r_method' in kwargs.keys():
+            xl_out = tf.image.resize(xl_out, out_shape, method=kwargs['r_method'])
+        else:
+            xl_out = tf.image.resize(xl_out, out_shape, method='bilinear')
         sums.append(xl_out)
     return tf.reduce_sum(sums, axis=0)
 
@@ -110,7 +113,7 @@ def cond_res_block(x, h, out_filters, nonlinearity, normalizer, rescale=False, *
             shortcut = nn.conv2d_plus(x_skip, out_filters, filter_size=[1,1])
             shortcut = tf.nn.avg_pool2d(shortcut, ksize=(1,2,2,1), strides=(1,2,2,1), padding='SAME')
         else:
-            shortcut = nn.conv2d_plus(x_skip, out_filters)
+            shortcut = nn.conv2d_plus(x_skip, out_filters) # without nonlinearity
 
     if h is not None:
         h = nn.nin(h, out_filters)
@@ -126,24 +129,38 @@ class cond_refine_net_plus():
     for sde 
     """
 
-    def __init__(self, config, chns=2, normalizer=nn.instance_norm_plus, scale_out=True):
+    def __init__(self, config, chns=2, scale_out=True):
 
         self.chns          = chns
         self.nr_filters    = config['nr_filters']
         self.nonlinearity  = utils.get_nonlinearity(config['nonlinearity'])
-        self.normalizer    = normalizer
         self.counters      = {}
         self.affine_x      = config['affine_x']
         self.fourier_scale = config['fourier_scale']
         self.attention     = config['attention']
         self.dropout       = 0. if 'dropout' not in config.keys() else config['dropout']
         self.scale_out     = scale_out
+
+        if 'normalizer' in config.keys():
+            if config['normalizer'] == 'group':
+                self.normalizer = nn.group_norm
+            elif config['normalizer'] == 'instance':
+                self.normalizer = nn.instance_norm
+            elif config['normalizer'] == 'instance_plus':
+                self.normalizer = nn.instance_norm_plus
+            else:
+                raise ValueError("group, instance, instance_plus norm are available")
+        else:
+            self.normalizer = nn.instance_norm_plus
+
         if config['body'] == 'small':
             self.forward       = tf.make_template('forward', self.small_body)
         elif config['body'] == 'big':
             self.forward       = tf.make_template('forward', self.big_body)
         elif config['body'] == 'huge':
             self.forward       = tf.make_template('forward', self.huge_body)
+        elif config['body'] == 'tiny':
+            self.forward       = tf.make_template('forward', self.tiny_body)
         else:
             raise Exception('body option is wrong.')
 
@@ -242,6 +259,41 @@ class cond_refine_net_plus():
                 out = out / t[:, tf.newaxis, tf.newaxis, tf.newaxis]
             return out
     
+    def tiny_body(self, x, t):
+
+        if self.affine_x:
+            x = 2*x - 1
+        
+        with arg_scope([nn.conv2d_plus, nn.embed_t, nn.nin, cond_refine_block, cond_crp_block, cond_rcu_block, cond_msf_block, cond_res_block, self.normalizer],
+                                 nonlinearity=self.nonlinearity, counters=self.counters, normalizer=self.normalizer, dropout=self.dropout):
+            
+            proj_t = nn.embed_t(tf.math.log(t), embedding_size=self.nr_filters, scale=self.fourier_scale)
+
+            proj_t = nn.nin(proj_t, self.nr_filters * 2, self.nonlinearity)
+            proj_t = nn.nin(proj_t, self.nr_filters*4, nonlinearity=None)
+
+            x_level_0 = nn.conv2d_plus(x, num_filters=1*self.nr_filters, nonlinearity=None)
+            x_level_1_0 = cond_res_block(x_level_0, h=proj_t, out_filters=1*self.nr_filters, rescale=False)
+            x_level_1_1 = cond_res_block(x_level_1_0, h=proj_t, out_filters=1*self.nr_filters, rescale=False)
+            x_level_2_0 = cond_res_block(x_level_1_1, h=proj_t, out_filters=2*self.nr_filters, rescale=True)
+            x_level_2_1 = cond_res_block(x_level_2_0, h=proj_t, out_filters=2*self.nr_filters, rescale=False)
+            x_level_3_0 = cond_res_block(x_level_2_1, h=proj_t, out_filters=2*self.nr_filters, rescale=True, dilation=2)
+            x_level_3_1 = cond_res_block(x_level_3_0, h=proj_t, out_filters=2*self.nr_filters, rescale=False, dilation=2)
+            
+            refine_1 = cond_refine_block([x_level_3_1], h=proj_t, nr_filters=2*self.nr_filters, out_shape=nn.int_shape(x_level_3_1)[1:3])
+            refine_2 = cond_refine_block([x_level_2_1, refine_1], h=proj_t, nr_filters=1*self.nr_filters, out_shape=nn.int_shape(x_level_2_1)[1:3])
+            refine_3 = cond_refine_block([x_level_1_1, refine_2], h=proj_t, nr_filters=1*self.nr_filters, out_shape=nn.int_shape(x_level_1_1)[1:3], end=True)
+            
+
+            out = self.normalizer(refine_3)
+            out = self.nonlinearity(out)
+            out = nn.conv2d_plus(out, num_filters=self.chns, nonlinearity=None)
+            
+            self.counters = {} # reset counters
+            if self.scale_out:
+                out = out / t[:, tf.newaxis, tf.newaxis, tf.newaxis]
+            return out
+
     def huge_body(self, x, t):
         """
         multi level refine net conditional on t

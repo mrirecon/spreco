@@ -24,15 +24,17 @@ class MODELS():
 
     """
     NCSN         = 'NCSN'
-    SDE          = 'SDE'
+    SDE          = 'SDE'  # variance exploded diffusion model
     PIXELCNN     = 'PIXELCNN'
+    SDE2         = 'SDE2' # Variance preserved diffusion model
     
     @staticmethod
     def get():
         return [
             MODELS.NCSN,
             MODELS.SDE,
-            MODELS.PIXELCNN
+            MODELS.PIXELCNN,
+            MODELS.SDE2
         ]
 
 

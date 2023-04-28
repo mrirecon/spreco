@@ -51,8 +51,12 @@ def main(config_path):
         x     ---> file path
         imgs  ---> normalized images with shape (batch_size, x, y, 2) 
         """
-        #path, ext = os.path.splitext(x)
-        imgs = np.squeeze(np.load(x)['rss'])[np.newaxis, ...]
+        path, ext = os.path.splitext(x)
+        
+        if ext == '.npz':
+            imgs = np.squeeze(np.load(x)['rss'])[np.newaxis, ...]
+        else:
+            imgs = np.squeeze(utils.readcfl(path))
         imgs = imgs / np.max(np.abs(imgs), axis=(1,2), keepdims=True)
         imgs = utils.cplx2float(imgs)
         return imgs
@@ -95,16 +99,19 @@ def main(config_path):
         # x is a dummy arg
         return np.random.randint(0, config['nr_levels'], (1), dtype=dtype)
 
-    def randfloat(x):
+    def randfloat(x, eps= 1.e-5, T= 1.):
         # x is a dummy arg
-        return np.random.uniform(config['sigma_min'], config['sigma_max'], size=(1))
+        if config['model'] == 'SDE2':
+            return np.random.uniform(eps, T, size=(1))
+        else:
+            return np.random.uniform(config['sigma_min'], config['sigma_max'], size=(1))
 
     if config['model'] == 'NCSN':
         def map_f(x):
             d1 = aug_load_file(x)
             d2 = np.squeeze(randint(x))
             return {"inputs": d1, "t": d2}
-    elif config['model'] == 'SDE':
+    elif config['model'] == 'SDE' or 'SDE2':
         def map_f(x):
             d1 = aug_load_file(x)
             d2 = np.squeeze(randfloat(x))

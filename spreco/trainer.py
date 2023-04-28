@@ -40,6 +40,9 @@ class trainer():
         elif self.config['model'] == MODELS.SDE:
             from spreco.model.sde import sde as selected_class
 
+        elif self.config['model'] == MODELS.SDE2:
+            from spreco.model.sde2 import sde as selected_class
+
         elif self.config['model'] == MODELS.PIXELCNN:
             from spreco.model.pixelcnn import pixelcnn as selected_class
 

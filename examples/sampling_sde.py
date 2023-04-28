@@ -6,7 +6,7 @@ import os
 import sys
 
 evalpath = lambda pr, ch: os.path.join(pr, ch)
-savecfl  = lambda p, a: utils.writecfl(p, utils.float2cplx(a))
+savecfl  = lambda p, a: utils.writecfl(p, utils.float2cplx(a)) if a.shape[-1] == 2 else utils.writecfl(p, a)
 
 s_config = utils.load_config(sys.argv[1])
 
@@ -33,7 +33,11 @@ def check_paras(m_config, n_config):
 
     return m_config
 
-check_paras(config, s_config)
+
+if config['model'] == "SDE":
+    config=check_paras(config, s_config)
+if config['model'] == 'SDE2':
+    config['N'] = s_config['N']
 
 save_path  = utils.create_folder(evalpath(s_config['log_folder'], 'samples'))
 utils.save_config(s_config, save_path)
@@ -44,10 +48,14 @@ print("INFO -> sigma type: %s, sigma max: %.4f, simga min: %.4f, discrete steps:
 a_sampler = sampler(config, s_config['target_snr'], s_config['sigma_type'])
 a_sampler.init_sampler(model_path, gpu_id=s_config['gpu_id'])
 
-image_n, image  = a_sampler.pc_sampler(s_config['nr_samples'], s_config['steps_pc'])
-savecfl(evalpath(save_path, 'pc'), image[-1])
-savecfl(evalpath(save_path, 'pc_n'), image_n[-1])
+if True:
+    image_n, image  = a_sampler.pc_sampler(s_config['nr_samples'], s_config['steps_pc'])
+    savecfl(evalpath(save_path, 'pc'), image[-1])
 
-image_n, image  = a_sampler.ancestral_sampler(s_config['nr_samples'], s_config['steps_an'])
-savecfl(evalpath(save_path, 'an'), image[-1])
-savecfl(evalpath(save_path, 'an_n'), image_n[-1])
+if True:
+    image_n, image  = a_sampler.ancestral_sampler(s_config['nr_samples'], s_config['steps_an'])
+    savecfl(evalpath(save_path, 'an'), image[-1])
+
+if True:
+    image  = a_sampler.ode_solver(s_config['nr_samples'])
+    savecfl(evalpath(save_path, 'ode'), image[-1])
