@@ -1,4 +1,3 @@
-from spreco.model.unet import unet
 from spreco.model.refine_net_sde import cond_refine_net_plus
 from spreco.common.custom_adam import AdamOptimizer
 
