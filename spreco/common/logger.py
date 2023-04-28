@@ -40,7 +40,10 @@ class tb_logger(object):
             from tensorflow.python.client import _pywrap_events_writer as event_writer # v2
         except:
             #print("using tensorflow 1.x")
-            from tensorflow.python import pywrap_tensorflow as event_writer# v1
+            try:
+                from tensorflow.python import pywrap_tensorflow as event_writer# v1
+            except:
+                from tensorflow.python import _pywrap_events_writer as event_writer # v2
         else:
             pass
             #print("using tensorflow 2.x")
