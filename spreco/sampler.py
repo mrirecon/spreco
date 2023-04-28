@@ -26,8 +26,6 @@ class sampler():
         reverse diffusion
         """
         f, G    = self.model.reverse_sde(x, t, self.sigma_type)
-        f       = f
-        G       = G
         z       = tf.random.normal(tf.shape(x))
         x_mean  = x - f 
         x       = x_mean + G * z
@@ -52,19 +50,32 @@ class sampler():
 
         return [x, x_mean]
 
-    def an_update(self, x, t):
-        diffusion=self.model.sde(x,t, self.sigma_type)[1]
-        x_mean = x + self.model.score(x, t, self.sigma_type)*diffusion**2
-        ratio  = self.model.sigma_t(t - 0.5/self.model.N, self.sigma_type)/self.model.sigma_t(t + 0.5/self.model.N, self.sigma_type)
-        std    = diffusion*ratio[:, tf.newaxis, tf.newaxis, tf.newaxis]
-        x      = x_mean + tf.random.normal(tf.shape(x), seed=self.model.seed)*std
+    def euler_update(self, x, t):
+        drift, diffusion=self.model.reverse_sde(x, t, self.sigma_type)
+        x_mean = x - drift
+        x      = x_mean + tf.random.normal(tf.shape(x), seed=self.model.seed)*diffusion
         return x, x_mean
+    
+    def an_update(self, x, t):
+        drift, diffusion=self.model.reverse_sde(x, t, self.sigma_type)
+        x_mean = x - drift
+        x      = x_mean + tf.random.normal(tf.shape(x), seed=self.model.seed)*diffusion
+        return x, x_mean
+    
+    def ode_update(self, x, t):
+        
+        drift, _ = self.model.reverse_sde(x, t, self.sigma_type, True)
+        x = x - drift
+
+        return x
 
     def init_ops(self):
         self.corrector_op = self.corrector(self.model.x, self.model.t)
         self.predictor_op = self.predictor(self.model.x, self.model.t)
+        self.euler_update_op = self.euler_update(self.model.x, self.model.t)
         self.an_update_op = self.an_update(self.model.x, self.model.t)
         self.sig_op = self.model.sde(self.model.x, self.model.t, self.sigma_type)[1]
+        self.ode_update_op = self.ode_update(self.model.x, self.model.t)
 
     def get_shape(self, samples):
         return [samples] + self.model.x.shape[1:]
@@ -93,6 +104,28 @@ class sampler():
         
         return xs, xs_mean
     
+    def euler_sampler(self, nr_samples, steps):
+
+        t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
+        x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
+
+        xs      = []
+        xs_mean = []
+
+
+        for t_i in tqdm.tqdm(t_vals):
+            for _ in range(steps):
+                x_val, x_mean = self.sess.run(self.euler_update_op, {self.model.x: x_val, self.model.t: [t_i for _ in range(nr_samples)]})
+            
+                if self.cond_func is not None:
+                    sig = self.sess.run(self.sig_op, {self.model.t: [t_i]})
+                    x_val = self.cond_func(x_val, sig)
+
+            xs.append(x_val)
+            xs_mean.append(x_mean)
+
+        return xs, xs_mean
+    
     def ancestral_sampler(self, nr_samples, steps):
 
         t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
@@ -114,6 +147,18 @@ class sampler():
             xs_mean.append(x_mean)
 
         return xs, xs_mean
+    
+    def ode_solver(self, nr_samples):
+        t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
+        x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
+        xs = []
+
+        for t_i in tqdm.tqdm(t_vals):
+            
+            x_val = self.sess.run(self.ode_update_op, {self.model.x: x_val, self.model.t: [t_i for _ in range(nr_samples)]})
+            xs.append(x_val)
+        
+        return xs
 
     def init_sampler(self, model_path, gpu_id=None, seed=None):
         
@@ -127,6 +172,9 @@ class sampler():
 
         elif self.config['model'] == MODELS.SDE:
             from spreco.model.sde import sde as selected_class
+        
+        elif self.config['model'] == MODELS.SDE2:
+            from spreco.model.sde2 import sde as selected_class
 
         elif self.config['model'] == MODELS.PIXELCNN:
             from spreco.model.pixelcnn import pixelcnn as selected_class
