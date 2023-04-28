@@ -1,10 +1,14 @@
-log_folder: /home/gluo/workspace/nlinv_prior/logs/20230331-115637
-model_name: sde_abide_500
+log_folder: /home/gluo/workspace/nlinv_prior/logs/20230428-171845
+model_name: ddpm_hku_300
 
-gpu_id: '2'
+gpu_id: '3'
 
-nr_samples: 50
-target_snr: 0.15
-skip: 1
-steps_pc: 2
+N: 100
+sigma_type: 'exp'
+sigma_max: 5.      # shouldn't be larger than the sigma_max in train config
+sigma_min: 0.005   # shouldn't be smaller than the sigma_min in train config
+
+nr_samples: 1
+target_snr: 0.25
+steps_pc: 1
 steps_an: 1
