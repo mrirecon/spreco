@@ -37,8 +37,8 @@ class tb_logger(object):
         path = osp.join(osp.abspath(dir), prefix)
         import tensorflow.compat.v1 as tf
         try:
-            from tensorflow.python.client import _pywrap_events_writer as event_writer # v2
             try:
+                from tensorflow.python.client import _pywrap_events_writer as event_writer # v2
                 a = event_writer.EventsWriter
             except:
                 from tensorflow.python import _pywrap_events_writer as event_writer # v2
