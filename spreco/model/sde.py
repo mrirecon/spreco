@@ -26,6 +26,7 @@ class sde():
 
         self.seed         = config['seed']
         self.type         = 'SMLD'
+        self.continuous   = True if 'continuous' not in config.keys() else config['continuous'] # continuous sde take longer to be well-trained
 
     def init_placeholder(self, mode=0, batch_size=None):
 
