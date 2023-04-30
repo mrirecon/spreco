@@ -427,8 +427,12 @@ def group_norm(x, groups=32, counters={}, **kwargs):
     if groups > channels:
         raise ValueError('Invalid groups %d for %d channels' % (groups, channels))
 
-    new_shape = in_shape[:-1] + [groups, channels//groups]
-    x = tf.reshape(x, new_shape)
+    if None in in_shape:
+        shape = [-1, in_shape[1], in_shape[2], groups, channels//groups]
+    else:
+        shape = [in_shape[0], in_shape[1], in_shape[2], groups, channels//groups]
+
+    x = tf.reshape(x, shape)
 
     params_shape = [1, 1, 1, groups, channels//groups]
 
@@ -441,10 +445,11 @@ def group_norm(x, groups=32, counters={}, **kwargs):
         mean, variance = tf.nn.moments(x, [1,2,4], keepdims=True)
 
         x = tf.nn.batch_normalization(x, mean, variance, offset = beta, scale=gamma, variance_epsilon=1e-12, name='group_norm')
-    
-    out = tf.reshape(x, in_shape)
+        
+    out = tf.reshape(x, shape[:-2]+[channels])
 
     return out
+
 
 @add_arg_scope
 def instance_norm_plus(x, counters={}, **kwargs):

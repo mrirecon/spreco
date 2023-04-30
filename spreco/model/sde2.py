@@ -17,17 +17,14 @@ class sde():
         self.beta_min = config['beta_min']
 
         self.seed     = config['seed']
-        self.N        = 1000 if 'N' not in  config.keys() else config['N']
+        self.N        = 200 if 'N' not in  config.keys() else config['N']
         self.T        = 1.
         self.eps      = 1.e-5
 
-        if config['net'] == 'refine':
-            self.net      = cond_refine_net_plus(config, chns=config['data_chns'], scale_out=False)
-        else:
-            self.net      = unet(config, chns=config['data_chns'])
-            
-        self.type     = 'DDPM'
-    
+        self.net        = cond_refine_net_plus(config, chns=config['data_chns'], scale_out=False)
+        self.type       = 'DDPM'
+        self.continuous = True if 'continuous' not in config.keys() else config['continuous'] # continuous sde take longer to be well-trained
+
     def init_placeholder(self, mode=0, batch_size=None):
 
         if mode == 0:
@@ -47,7 +44,19 @@ class sde():
 
     def beta_t(self, t):
         return self.beta_min + t * (self.beta_max - self.beta_min)
+
+    def betas(self):
+        return self.beta_t(tf.linspace(self.eps, self.T, self.N))/self.N
     
+    def alphas(self):
+        return 1. - self.betas()
+    
+    def sqrt_alpha_cumprod(self):
+        return tf.sqrt(tf.cumprod(self.alphas(), axis=0))
+
+    def sqrt_1m_alphas_cumprod(self):
+        return tf.sqrt(1. - tf.cumprod(self.alphas(), axis=0))
+
     def sde(self, x, t, typ=None):
         beta = self.beta_t(t)[:, None, None, None]
         drift = - 0.5 * beta * x / self.N
@@ -64,10 +73,34 @@ class sde():
         drift = drift - diffusion ** 2 * score
         return drift, diffusion
 
+    def discretize(self, x, t):
+        timestep  = tf.cast((t / self.T) * (self.N-1), tf.int32)
+        beta      = tf.gather(self.betas(), timestep)[:, tf.newaxis, tf.newaxis, tf.newaxis]
+        alpha     = tf.gather(self.alphas(), timestep)[:, tf.newaxis, tf.newaxis, tf.newaxis]
+
+        f         = tf.sqrt(alpha)*x - x
+        g         = tf.sqrt(beta)
+        return f, g
+    
+    def reverse_discrete(self, x, t, typ=None, ode=False):
+        f, G  = self.discretize(x, t)
+
+        if ode:
+            score = 0.5 * self.score(x, t)
+        else:
+            score = self.score(x, t)
+
+        return f - G ** 2 * score, G
+
     def score(self, x_t, t, typ=None):
-        log_mean_coeff = -0.25 * t ** 2 * (self.beta_max - self.beta_min) - 0.5 * t * self.beta_min
-        std = tf.sqrt(-tf.math.expm1(2. * log_mean_coeff))
-        return self.net.forward(x_t, t)
+
+        if self.continuous:
+            log_mean_coeff = -0.25 * t ** 2 * (self.beta_max - self.beta_min) - 0.5 * t * self.beta_min
+            std = tf.sqrt(-tf.math.expm1(2. * log_mean_coeff))
+        else:
+            timestep  = tf.cast(( t / self.T) * (self.N-1), tf.int32)
+            std = tf.gather(self.sqrt_1m_alphas_cumprod(), timestep)
+        return -self.net.forward(x_t, std)/std[:, tf.newaxis, tf.newaxis, tf.newaxis]
 
 
     def prior_sampling(self, shape, seed=None):
@@ -77,9 +110,18 @@ class sde():
         return tf.random.normal(shape, seed=seed) 
 
     def marginal_prob(self, x, t):
-        log_mean_coeff = -0.25 * t ** 2 * (self.beta_max - self.beta_min) - 0.5 * t * self.beta_min
-        mean = tf.exp(log_mean_coeff[:, tf.newaxis, tf.newaxis, tf.newaxis]) * x
-        std = tf.sqrt(-tf.math.expm1(2. * log_mean_coeff))
+        if self.continuous:
+
+            log_mean_coeff = -0.25 * t ** 2 * (self.beta_max - self.beta_min) - 0.5 * t * self.beta_min
+            mean = tf.exp(log_mean_coeff[:, tf.newaxis, tf.newaxis, tf.newaxis]) * x
+            std = tf.sqrt(-tf.math.expm1(2. * log_mean_coeff))
+
+        else:
+
+            timestep  = tf.cast((t / self.T) * (self.N-1), tf.int32)
+            mean = (tf.gather(self.sqrt_alpha_cumprod(), timestep)[:, tf.newaxis, tf.newaxis, tf.newaxis]) * x
+            std = tf.gather(self.sqrt_1m_alphas_cumprod(), timestep)
+
         return mean, std
 
     def loss(self, x, t):
@@ -91,11 +133,11 @@ class sde():
 
         x_t  = mean + std[:, tf.newaxis, tf.newaxis, tf.newaxis]*z
 
-        score = self.net.forward(x_t, t)
+        z_theta = -self.net.forward(x_t, std)
 
         reduce    = lambda tmp: tf.reduce_mean(tmp, axis=[1,2,3]) if self.config['reduce_mean'] else tf.reduce_sum(tmp, axis=[1,2,3])
 
-        l = reduce(tf.math.square(score*std[:, tf.newaxis, tf.newaxis, tf.newaxis] + z))
+        l = reduce(tf.math.square(z_theta + z))
 
         l = tf.reduce_mean(l)
 

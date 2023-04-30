@@ -25,7 +25,7 @@ class sampler():
         """
         reverse diffusion
         """
-        f, G    = self.model.reverse_sde(x, t, self.sigma_type)
+        f, G    = self.reverse(x, t, self.sigma_type)
         z       = tf.random.normal(tf.shape(x))
         x_mean  = x - f 
         x       = x_mean + G * z
@@ -51,20 +51,27 @@ class sampler():
         return [x, x_mean]
 
     def euler_update(self, x, t):
-        drift, diffusion=self.model.reverse_sde(x, t, self.sigma_type)
+        drift, diffusion=self.reverse(x, t, self.sigma_type)
         x_mean = x - drift
         x      = x_mean + tf.random.normal(tf.shape(x), seed=self.model.seed)*diffusion
         return x, x_mean
     
     def an_update(self, x, t):
-        drift, diffusion=self.model.reverse_sde(x, t, self.sigma_type)
-        x_mean = x - drift
-        x      = x_mean + tf.random.normal(tf.shape(x), seed=self.model.seed)*diffusion
+        if self.model.type == 'DDPM':
+            timestep  = tf.cast(t  * (self.model.N-1), tf.int32)
+            beta = tf.gather(self.model.betas(), timestep)
+            score = self.model.score(x, t)
+            x_mean = (x + beta[:, None, None, None] * score) / tf.sqrt(1. - beta)[:, None, None, None]
+            x = x_mean + tf.sqrt(beta)[:, None, None, None] * tf.random.normal(tf.shape(x), seed=self.model.seed)
+        else:
+            drift, diffusion=self.reverse(x, t, self.sigma_type)
+            x_mean = x - drift
+            x      = x_mean + tf.random.normal(tf.shape(x), seed=self.model.seed)*diffusion
         return x, x_mean
     
     def ode_update(self, x, t):
         
-        drift, _ = self.model.reverse_sde(x, t, self.sigma_type, True)
+        drift, _ = self.reverse(x, t, self.sigma_type, True)
         x = x - drift
 
         return x
@@ -185,6 +192,12 @@ class sampler():
         self.model = selected_class(self.config)
 
         self.model.init(mode=1, batch_size=None)
+
+        if self.model.continuous:
+            self.reverse = self.model.reverse_sde
+        else:
+            self.reverse = self.model.reverse_discrete
+
         self.init_ops()
 
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
