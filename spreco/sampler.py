@@ -51,7 +51,7 @@ class sampler():
         return [x, x_mean]
 
     def euler_update(self, x, t):
-        drift, diffusion=self.reverse(x, t, self.sigma_type)
+        drift, diffusion=self.reverse(x, t, self.sigma_type, ode=True)
         x_mean = x - drift
         x      = x_mean + tf.random.normal(tf.shape(x), seed=self.model.seed)*diffusion
         return x, x_mean
