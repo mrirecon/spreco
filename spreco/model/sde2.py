@@ -13,8 +13,8 @@ class sde():
     def __init__(self, config):
 
         self.config   = config
-        self.beta_max = config['beta_max']
-        self.beta_min = config['beta_min']
+        self.sigma_max = config['sigma_max']
+        self.sigma_min = config['sigma_min']
 
         self.seed     = config['seed']
         self.N        = 200 if 'N' not in  config.keys() else config['N']
@@ -42,14 +42,14 @@ class sde():
             self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'])
             self.t = tf.placeholder(tf.float32, shape=[batch_size])
 
-    def beta_t(self, t):
-        return self.beta_min + t * (self.beta_max - self.beta_min)
+    def sigma_t(self, t):
+        return self.sigma_min + t * (self.sigma_max - self.sigma_min)
 
-    def betas(self):
-        return self.beta_t(tf.linspace(self.eps, self.T, self.N))/self.N
+    def sigmas(self):
+        return self.sigma_t(tf.linspace(self.eps, self.T, self.N))/self.N
     
     def alphas(self):
-        return 1. - self.betas()
+        return 1. - self.sigmas()
     
     def sqrt_alpha_cumprod(self):
         return tf.sqrt(tf.cumprod(self.alphas(), axis=0))
@@ -58,9 +58,9 @@ class sde():
         return tf.sqrt(1. - tf.cumprod(self.alphas(), axis=0))
 
     def sde(self, x, t, typ=None):
-        beta = self.beta_t(t)[:, None, None, None]
-        drift = - 0.5 * beta * x / self.N
-        diffusion = tf.sqrt(beta/self.N)
+        sigma = self.sigma_t(t)[:, None, None, None]
+        drift = - 0.5 * sigma * x / self.N
+        diffusion = tf.sqrt(sigma/self.N)
         return drift, diffusion
 
     def reverse_sde(self, x, t, typ=None, ode=False):
@@ -75,11 +75,11 @@ class sde():
 
     def discretize(self, x, t):
         timestep  = tf.cast((t / self.T) * (self.N-1), tf.int32)
-        beta      = tf.gather(self.betas(), timestep)[:, tf.newaxis, tf.newaxis, tf.newaxis]
+        sigma      = tf.gather(self.sigmas(), timestep)[:, tf.newaxis, tf.newaxis, tf.newaxis]
         alpha     = tf.gather(self.alphas(), timestep)[:, tf.newaxis, tf.newaxis, tf.newaxis]
 
         f         = tf.sqrt(alpha)*x - x
-        g         = tf.sqrt(beta)
+        g         = tf.sqrt(sigma)
         return f, g
     
     def reverse_discrete(self, x, t, typ=None, ode=False):
@@ -95,7 +95,7 @@ class sde():
     def score(self, x_t, t, typ=None):
 
         if self.continuous:
-            log_mean_coeff = -0.25 * t ** 2 * (self.beta_max - self.beta_min) - 0.5 * t * self.beta_min
+            log_mean_coeff = -0.25 * t ** 2 * (self.sigma_max - self.sigma_min) - 0.5 * t * self.sigma_min
             std = tf.sqrt(-tf.math.expm1(2. * log_mean_coeff))
         else:
             timestep  = tf.cast(( t / self.T) * (self.N-1), tf.int32)
@@ -112,32 +112,33 @@ class sde():
     def marginal_prob(self, x, t):
         if self.continuous:
 
-            log_mean_coeff = -0.25 * t ** 2 * (self.beta_max - self.beta_min) - 0.5 * t * self.beta_min
-            mean = tf.exp(log_mean_coeff[:, tf.newaxis, tf.newaxis, tf.newaxis]) * x
+            log_mean_coeff = -0.25 * t ** 2 * (self.sigma_max - self.sigma_min) - 0.5 * t * self.sigma_min
+            mean = tf.exp(log_mean_coeff[:, tf.newaxis, tf.newaxis, tf.newaxis])
             std = tf.sqrt(-tf.math.expm1(2. * log_mean_coeff))
 
         else:
 
             timestep  = tf.cast((t / self.T) * (self.N-1), tf.int32)
-            mean = (tf.gather(self.sqrt_alpha_cumprod(), timestep)[:, tf.newaxis, tf.newaxis, tf.newaxis]) * x
+            mean = tf.gather(self.sqrt_alpha_cumprod(), timestep)[:, tf.newaxis, tf.newaxis, tf.newaxis]
             std = tf.gather(self.sqrt_1m_alphas_cumprod(), timestep)
 
         return mean, std
 
-    def loss(self, x, t):
+    def loss(self, x, t, weight=False):
         """
         """
         z = tf.random.normal(tf.shape(x))
 
         mean, std = self.marginal_prob(x, t)
 
-        x_t  = mean + std[:, tf.newaxis, tf.newaxis, tf.newaxis]*z
+        x_t  = mean*x + std[:, tf.newaxis, tf.newaxis, tf.newaxis]*z
 
         z_theta = -self.net.forward(x_t, std)
 
         reduce    = lambda tmp: tf.reduce_mean(tmp, axis=[1,2,3]) if self.config['reduce_mean'] else tf.reduce_sum(tmp, axis=[1,2,3])
-
-        l = reduce(tf.math.square(z_theta + z))
+        if weight:
+            w = tf.sigmoid(mean/(std[:, tf.newaxis, tf.newaxis, tf.newaxis]**2))
+        l = reduce(tf.math.square(z_theta + z) if not weight else w * tf.math.square(z_theta + z))
 
         l = tf.reduce_mean(l)
 
@@ -149,7 +150,7 @@ class sde():
 
         if mode == 0:
 
-            _          = self.loss(self.x[0], self.t[0])
+            _          = self.loss(self.x[0], self.t[0], weight= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight'])
             all_params = tf.trainable_variables()
 
             loss      = []
@@ -161,14 +162,14 @@ class sde():
             for i in range(self.config['nr_gpu']):
                 with tf.device('/gpu:%d'%i):
                     # train
-                    loss.append(self.loss(self.x[i], self.t[i]))
+                    loss.append(self.loss(self.x[i], self.t[i], weight= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight']))
 
                     gvs = optimizer.compute_gradients(loss[-1], all_params)
                     gvs = [(k, v) for (k, v) in gvs if k is not None]
                     grads.append(gvs)
 
                     # test
-                    loss_test.append(self.loss(self.x[i], self.t[i]))
+                    loss_test.append(self.loss(self.x[i], self.t[i], weight= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight']))
 
             with tf.device('/gpu:0'):
                 for i in range(1, self.config['nr_gpu']):
@@ -183,7 +184,7 @@ class sde():
 
         elif mode == 1:
             self.net.dropout = 0.0
-            _  = self.loss(self.x, self.t)
+            _  = self.loss(self.x, self.t, weight= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight'])
 
         elif mode == 2:
 
@@ -204,4 +205,4 @@ class sde():
                 self.t = tf.placeholder(tf.float32, shape=[batch_size], name="input_1")
                 diffusion=self.sde(self.x, self.t, self.config['sigma_type'])[1]
                 self.default_out = self.score(self.x, self.t, self.config['sigma_type']) * diffusion**2
-                _  = self.loss(self.x, self.t)
+                _  = self.loss(self.x, self.t, weight= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight'])
