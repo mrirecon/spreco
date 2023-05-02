@@ -129,7 +129,7 @@ class cond_refine_net_plus():
     for sde 
     """
 
-    def __init__(self, config, chns=2, scale_out=True):
+    def __init__(self, config, chns=2, scale_out=True, multiple_times=0):
 
         self.chns          = chns
         self.nr_filters    = config['nr_filters']
@@ -160,7 +160,7 @@ class cond_refine_net_plus():
         elif config['body'] == 'huge':
             self.forward       = tf.make_template('forward', self.huge_body)
         elif config['body'] == 'tiny':
-            self.forward       = tf.make_template('forward', self.tiny_body)
+            self.forward       = tf.make_template('forward' if not multiple_times else 'forward_'+str(multiple_times), self.tiny_body)
         else:
             raise Exception('body option is wrong.')
 
