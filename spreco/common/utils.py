@@ -383,13 +383,10 @@ def print_parameters(file, mode="a"):
                 print("========layer=======")
                 print(variable)
                 shape = variable.get_shape()
-                print("shape->",shape)
-                print("shape->len",len(shape))
                 variable_parameters = 1
                 for dim in shape:
-                    print("dim->", dim)
                     variable_parameters *= dim
-                print(variable_parameters)
+                print("shape ->", shape, variable_parameters)
                 total_parameters += variable_parameters
             print(total_parameters)
 
