@@ -1,4 +1,4 @@
-## Generative Pre-trained Image Prior for MRI reconstruction
+## Bayesian MRI reconstruction with joint uncertainty estimation using diffusion models
 
 This package is to help you extract prior information for MRI image and then use it for MRI reconstruction. 
 
