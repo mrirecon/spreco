@@ -59,10 +59,10 @@ class sampler():
     def an_update(self, x, t):
         if self.model.type == 'DDPM':
             timestep  = tf.cast(t  * (self.model.N-1), tf.int32)
-            beta = tf.gather(self.model.betas(), timestep)
+            sigma = tf.gather(self.model.sigmas(), timestep)
             score = self.model.score(x, t)
-            x_mean = (x + beta[:, None, None, None] * score) / tf.sqrt(1. - beta)[:, None, None, None]
-            x = x_mean + tf.sqrt(beta)[:, None, None, None] * tf.random.normal(tf.shape(x), seed=self.model.seed)
+            x_mean = (x + sigma[:, None, None, None] * score) / tf.sqrt(1. - sigma)[:, None, None, None]
+            x = x_mean + tf.sqrt(sigma)[:, None, None, None] * tf.random.normal(tf.shape(x), seed=self.model.seed)
         else:
             drift, diffusion=self.reverse(x, t, self.sigma_type)
             x_mean = x - drift
@@ -87,7 +87,7 @@ class sampler():
     def get_shape(self, samples):
         return [samples] + self.model.x.shape[1:]
     
-    def pc_sampler(self, nr_samples, steps):
+    def pc_sampler(self, nr_samples, innnersteps):
 
         t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
         x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
@@ -97,7 +97,7 @@ class sampler():
         xs_mean   = []
         for t_i in tqdm.tqdm(t_vals):
             x_val, x_mean = self.sess.run(self.corrector_op, {self.model.x: x_val, self.model.t: [t_i for _ in range(nr_samples)]})
-            for _ in range(steps):
+            for _ in range(innnersteps):
                 x_val, x_mean = self.sess.run(self.predictor_op, {self.model.x: x_val, self.model.t: [t_i for _ in range(nr_samples)]})
 
             if self.cond_func is not None:
@@ -111,7 +111,7 @@ class sampler():
         
         return xs, xs_mean
     
-    def euler_sampler(self, nr_samples, steps):
+    def euler_sampler(self, nr_samples, innnersteps=1):
 
         t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
         x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
@@ -121,7 +121,7 @@ class sampler():
 
 
         for t_i in tqdm.tqdm(t_vals):
-            for _ in range(steps):
+            for _ in range(innnersteps):
                 x_val, x_mean = self.sess.run(self.euler_update_op, {self.model.x: x_val, self.model.t: [t_i for _ in range(nr_samples)]})
             
                 if self.cond_func is not None:
@@ -133,7 +133,7 @@ class sampler():
 
         return xs, xs_mean
     
-    def ancestral_sampler(self, nr_samples, steps):
+    def ancestral_sampler(self, nr_samples, innnersteps):
 
         t_vals    = np.linspace(self.model.T, self.model.eps, self.model.N)
         x_val     = self.sess.run(self.model.prior_sampling(self.get_shape(nr_samples)))
@@ -143,7 +143,7 @@ class sampler():
 
 
         for t_i in tqdm.tqdm(t_vals):
-            for _ in range(steps):
+            for _ in range(innnersteps):
                 x_val, x_mean = self.sess.run(self.an_update_op, {self.model.x: x_val, self.model.t: [t_i for _ in range(nr_samples)]})
             
                 if self.cond_func is not None:
