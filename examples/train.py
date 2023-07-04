@@ -101,17 +101,17 @@ def main(config_path):
 
     def randfloat(x, eps= 1.e-5, T= 1.):
         # x is a dummy arg
-        if config['model'] == 'SDE2':
+        #if config['model'] == 'SDE2':
             return np.random.uniform(eps, T, size=(1))
-        else:
-            return np.random.uniform(config['sigma_min'], config['sigma_max'], size=(1))
+        #else:
+            #return np.random.uniform(config['sigma_min'], config['sigma_max'], size=(1))
 
     if config['model'] == 'NCSN':
         def map_f(x):
             d1 = aug_load_file(x)
             d2 = np.squeeze(randint(x))
             return {"inputs": d1, "t": d2}
-    elif config['model'] == 'SDE' or 'SDE2':
+    elif config['model'] == 'SDE' or config['model'] == 'SDE2':
         def map_f(x):
             d1 = aug_load_file(x)
             d2 = np.squeeze(randfloat(x))
