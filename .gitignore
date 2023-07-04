@@ -1,0 +1,12 @@
+*.pyc
+bart
+build
+spreco.egg-info
+examples_/*
+TODO
+tmp
+tests
+install.sh
+dist
+*.gz
+*.json
