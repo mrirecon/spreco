@@ -124,7 +124,7 @@ class sde():
 
         return mean, std
 
-    def loss(self, x, t, weight=False):
+    def loss(self, x, t, weighting=False):
         """
         """
         z = tf.random.normal(tf.shape(x))
@@ -136,9 +136,9 @@ class sde():
         z_theta = -self.net.forward(x_t, std)
 
         reduce    = lambda tmp: tf.reduce_mean(tmp, axis=[1,2,3]) if self.config['reduce_mean'] else tf.reduce_sum(tmp, axis=[1,2,3])
-        if weight:
+        if weighting:
             w = tf.sigmoid(mean/(std[:, tf.newaxis, tf.newaxis, tf.newaxis]**2))
-        l = reduce(tf.math.square(z_theta + z) if not weight else w * tf.math.square(z_theta + z))
+        l = reduce(tf.math.square(z_theta + z) if not weighting else w * tf.math.square(z_theta + z))
 
         l = tf.reduce_mean(l)
 
@@ -150,7 +150,7 @@ class sde():
 
         if mode == 0:
 
-            _          = self.loss(self.x[0], self.t[0], weight= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight'])
+            _          = self.loss(self.x[0], self.t[0], weighting= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight'])
             all_params = tf.trainable_variables()
 
             loss      = []
@@ -162,14 +162,14 @@ class sde():
             for i in range(self.config['nr_gpu']):
                 with tf.device('/gpu:%d'%i):
                     # train
-                    loss.append(self.loss(self.x[i], self.t[i], weight= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight']))
+                    loss.append(self.loss(self.x[i], self.t[i], weighting= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight']))
 
                     gvs = optimizer.compute_gradients(loss[-1], all_params)
                     gvs = [(k, v) for (k, v) in gvs if k is not None]
                     grads.append(gvs)
 
                     # test
-                    loss_test.append(self.loss(self.x[i], self.t[i], weight= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight']))
+                    loss_test.append(self.loss(self.x[i], self.t[i], weighting= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight']))
 
             with tf.device('/gpu:0'):
                 for i in range(1, self.config['nr_gpu']):
@@ -184,25 +184,17 @@ class sde():
 
         elif mode == 1:
             self.net.dropout = 0.0
-            _  = self.loss(self.x, self.t, weight= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight'])
+            _  = self.net.forward(self.x, self.t)
 
         elif mode == 2:
 
             self.net.dropout = 0.0
 
-            if 'sigma_type' in kwargs.keys() and kwargs['sigma_type'] is not None:
-                self.config['sigma_type'] = kwargs['sigma_type']
-            else:
-                self.config['sigma_type'] = 'linear'
-
-            print('INFO -> Exporting diffusion model with %s noise schedule'%self.config['sigma_type'])
-
             if 'default_out' in kwargs.keys() and kwargs['default_out'] == False:
                 print("INFO -> Customizing tf inputs and outputs")
-                
+
             else:
                 self.x = tf.placeholder(tf.float32, shape=[batch_size]+self.config['input_shape'], name="input_0")
                 self.t = tf.placeholder(tf.float32, shape=[batch_size], name="input_1")
-                diffusion=self.sde(self.x, self.t, self.config['sigma_type'])[1]
-                self.default_out = self.score(self.x, self.t, self.config['sigma_type']) * diffusion**2
-                _  = self.loss(self.x, self.t, weight= False if 'loss_weight' not in self.config.keys() else self.config['loss_weight'])
+                diffusion=self.sde(self.x, self.t)[1]
+                self.default_out = self.score(self.x, self.t) * diffusion**2
