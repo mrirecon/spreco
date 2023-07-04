@@ -46,6 +46,7 @@ class exporter():
         
         elif config['model'] == MODELS.SDE2:
             from spreco.model.sde2 import sde as selected_class
+            sigma_type = None
 
         elif config['model'] == MODELS.PIXELCNN:
             from spreco.model.pixelcnn import pixelcnn as selected_class
@@ -80,9 +81,9 @@ class exporter():
         self.sess.run(tf.global_variables_initializer())
         saver.restore(self.sess, os.path.join(self.log, self.meta))
 
-    def export(self, inputs, outputs):
+    def export(self, inputs, outputs, attach_gradients=False):
         self.restore()
         bart_tf.tf1_export_graph(self.path, session=self.sess,
                                 name=self.name,
                                 inputs=inputs,
-                                outputs=outputs, attach_gradients=False)
+                                outputs=outputs, attach_gradients=attach_gradients)
