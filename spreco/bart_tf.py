@@ -191,7 +191,9 @@ class TensorMap:
             self.tensor = tensor
         self.name = name
 
-        if (self.tensor.shape[-1] != 2) and (self.tensor.dtype == tf1.float32):
+        if (self.tensor.shape == ()) and (self.tensor.dtype == tf1.float32):
+            self.type = 'REAL'
+        elif (self.tensor.shape[-1] != 2) and (self.tensor.dtype == tf1.float32):
             self.type = "REAL"
         else:
             self.type = "COMPLEX"
