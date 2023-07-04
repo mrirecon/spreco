@@ -1,7 +1,6 @@
 from spreco.model import nn
 from spreco.model.utils import concat_elu
 from spreco.common.custom_adam import AdamOptimizer
-from spreco.common.options import DATA_CHNS
 
 import numpy as np
 from tf_slim import arg_scope
@@ -54,7 +53,7 @@ class pixelcnn():
                      'layer_norm': self.config['layer_norm']
                     }
 
-        if self.config['data_chns'] == DATA_CHNS.CPLX:
+        if self.config['data_chns'] == 2:
             if self.config['rlt'] == 1:
                 # assume the linear dependence between real and imaginary parts
                 from spreco.model.logistic_loss import discretized_mix_logistic_loss_2 as loss_func
@@ -67,7 +66,7 @@ class pixelcnn():
             else:
                 raise Exception("please check the assumption of relationship between real and imaginary")
 
-        if self.config['data_chns'] == DATA_CHNS.MAG:
+        if self.config['data_chns'] == 1:
             from spreco.model.logistic_loss import discretized_mix_logistic_loss_1 as loss_func
 
         self.init_placeholder(mode)
@@ -126,6 +125,7 @@ class pixelcnn():
                 self.loss_func = loss_func
             else:
                 #TODO: might not work
+                # The default setting only works when chns=2
                 self.x = tf.placeholder(tf.float32, shape=[None]+self.config['input_shape'], name="input_0")
 
                 _        = self.forward(self.x, init=True, dropout_p=0., **model_opt) 
@@ -134,13 +134,13 @@ class pixelcnn():
                 loss = loss_func(self.x, self.out)
                 loss = loss/(np.log(2.0)*np.prod(self.config['input_shape'])*1)
 
-                output = tf.identity(tf.stack([loss, tf.zeros_like(loss)], axis=-1), name='output_0')
+                self.default_out = tf.identity(tf.stack([loss, tf.zeros_like(loss)], axis=-1), name='output_0')
                 self.grads = tf.squeeze(tf.gradients(loss, self.x), name='grad_0') 
                 grad_ys = tf.placeholder(tf.float32, shape=[2], name='grad_ys_0')
 
 
     @staticmethod
-    def body(x, h=None, init=False, ema=None, layer_norm=False, dropout_p=0.5, nr_resnet=3, nr_filters=160, nr_logistic_mix=10, resnet_nonlinearity='concat_elu', data_chns=DATA_CHNS.CPLX, rlt=1):
+    def body(x, h=None, init=False, ema=None, layer_norm=False, dropout_p=0.5, nr_resnet=3, nr_filters=160, nr_logistic_mix=10, resnet_nonlinearity='concat_elu', data_chns=2, rlt=1):
         """
         We receive a Tensor x of shape (N,H,W,D1) (e.g. (12,32,32,3)) and produce
         a Tensor x_out of shape (N,H,W,D2) (e.g. (12,32,32,100)), where each fiber
@@ -149,7 +149,7 @@ class pixelcnn():
         'h' is an optional N x K matrix of values to condition our generative model on
         """
 
-        if data_chns==DATA_CHNS.MAG:
+        if data_chns==1:
             x = 2*x - 1   #TODO should be moved to data pipe
 
         counters = {}
@@ -267,9 +267,9 @@ class pixelcnn():
                 """
                 nr logits 3, 6 or 10 depends on the number of image channel magnitude, real/image or red/green/blue
                 """
-                if data_chns == DATA_CHNS.RGB:
+                if data_chns == 3:
                     nr_logits = 10
-                if data_chns == DATA_CHNS.CPLX:
+                if data_chns == 2:
                     if rlt == 1:
                         nr_logits = 6
                     elif rlt == 2:
@@ -278,7 +278,7 @@ class pixelcnn():
                         nr_logits = 5
                     else:
                         raise Exception("rlt shoulde be 1 or 2 or 3.")
-                if data_chns == DATA_CHNS.MAG:
+                if data_chns == 1:
                     nr_logits = 3
                     
                 x_out = nn.nin(tf.nn.elu(ul),nr_logits*nr_logistic_mix) 
