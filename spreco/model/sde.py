@@ -12,21 +12,22 @@ class sde():
 
     def __init__(self, config): 
 
-        self.config    = config
-        self.sigma_min = config['sigma_min']
-        self.sigma_max = config['sigma_max']
-        self.N         = 100 if 'N' not in  config.keys() else config['N']
-        self.T         = 1.
-        self.eps       = 1.e-5
+        self.config     = config
+        self.sigma_min  = config['sigma_min']
+        self.sigma_max  = config['sigma_max']
+        self.sigma_type = 'exp' if 'sigma_type' not in config.keys() else config['sigma_type']
+        self.N          = 1000 if 'N' not in  config.keys() else config['N']
+        self.T          = 1.
+        self.eps        = 1.e-5
 
         if 'scale_out' in self.config.keys():
-            self.net = cond_refine_net_plus(config, scale_out=self.config['scale_out'])
+            self.net = cond_refine_net_plus(config, chns=config['data_chns'], scale_out=self.config['scale_out']) # simplify
         else:
-            self.net = cond_refine_net_plus(config)
+            self.net = cond_refine_net_plus(config, chns=config['data_chns'])
 
         self.seed         = config['seed']
         self.type         = 'SMLD'
-        self.continuous   = True if 'continuous' not in config.keys() else config['continuous'] # continuous sde take longer to be well-trained
+        self.continuous   = True if 'continuous' not in config.keys() else config['continuous'] # continuous work well for SMLD sde
 
     def init_placeholder(self, mode=0, batch_size=None):
 
@@ -54,7 +55,7 @@ class sde():
 
     def sigma_t(self, t, typ='quad'):
         """
-        noise schedule for t in (1, 0)
+        noise schedule for t in (1, 0), distribution of sigma 
         """
         #
         if typ == "quad":
@@ -143,7 +144,7 @@ class sde():
         """
 
         z = tf.random.normal(tf.shape(x))
-        sigma = self.map_sigma(t)
+        sigma = self.sigma_t(t, self.sigma_type)
 
         std       = sigma[:, tf.newaxis, tf.newaxis, tf.newaxis]
         x_t       = x +  std * z
@@ -151,11 +152,8 @@ class sde():
 
         reduce    = lambda tmp: tf.reduce_mean(tmp, axis=[1,2,3]) if self.config['reduce_mean'] else tf.reduce_sum(tmp, axis=[1,2,3])
 
-        l = reduce(tf.math.square(score * std + z))
-        #loss = reduce(tf.math.square(score + z/std))
-        
-        if weighting:
-            l = l / std
+        l2 = tf.math.square(score * std + z)
+        l  = reduce(l2 if not weighting else std*l2)
 
         l = tf.reduce_mean(l)
 
@@ -201,7 +199,7 @@ class sde():
 
         elif mode == 1:
             self.net.dropout = 0.0
-            _  = self.loss(self.x, self.t)
+            _  = self.net.forward(self.x, self.t)
 
         elif mode == 2:
 
