@@ -330,23 +330,24 @@ def self_attention(x, qk_chns, v_chns, **kwargs):
     """
     Non local neural networks
     https://arxiv.org/pdf/1711.07971.pdf
+    from image task
     """
     shape = int_shape(x)
     if None in shape:
         flatten_shape = (-1, shape[1]*shape[2], shape[3])
-        out_shape = (-1, shape[1], shape[2], v_chns)
+        out_shape     = (-1, shape[1], shape[2], v_chns)
     else:
         flatten_shape = (shape[0], shape[1]*shape[2], shape[3])
-        out_shape = (shape[0], shape[1], shape[2], v_chns)
+        out_shape     = (shape[0], shape[1], shape[2], v_chns)
 
     query_conv = tf.reshape(nin(x, qk_chns, nonlinearity=None, scope='global_attention'), flatten_shape)
     key_conv   = tf.reshape(nin(x, qk_chns, nonlinearity=None, scope='global_attention'), flatten_shape)
     value_conv = tf.reshape(nin(x, v_chns, nonlinearity=None, scope='global_attention'), flatten_shape)
 
-    correlation = tf.einsum("bnf,bjf->bnj", query_conv, key_conv)
+    correlation   = tf.einsum("bnf,bjf->bnj", query_conv, key_conv)
     attention_map = tf.nn.softmax(correlation, axis=-1)
-    out = tf.einsum("bnf,bnj->bjf", value_conv, attention_map)
-    out = nin(out, v_chns, scope='global_attention')
+    out           = tf.einsum("bnf,bnj->bjf", value_conv, attention_map)
+    out           = nin(out, v_chns, scope='global_attention')
 
     if shape[-1] != v_chns:
         x = nin(x, v_chns, nonlinearity=None, scope='global_attention')
@@ -426,8 +427,12 @@ def group_norm(x, groups=32, counters={}, **kwargs):
     if groups > channels:
         raise ValueError('Invalid groups %d for %d channels' % (groups, channels))
 
-    new_shape = in_shape[:-1] + [groups, channels//groups]
-    x = tf.reshape(x, new_shape)
+    if None in in_shape:
+        shape = [-1, in_shape[1], in_shape[2], groups, channels//groups]
+    else:
+        shape = [in_shape[0], in_shape[1], in_shape[2], groups, channels//groups]
+
+    x = tf.reshape(x, shape)
 
     params_shape = [1, 1, 1, groups, channels//groups]
 
@@ -440,10 +445,11 @@ def group_norm(x, groups=32, counters={}, **kwargs):
         mean, variance = tf.nn.moments(x, [1,2,4], keepdims=True)
 
         x = tf.nn.batch_normalization(x, mean, variance, offset = beta, scale=gamma, variance_epsilon=1e-12, name='group_norm')
-    
-    out = tf.reshape(x, in_shape)
+        
+    out = tf.reshape(x, shape[:-2]+[channels])
 
     return out
+
 
 @add_arg_scope
 def instance_norm_plus(x, counters={}, **kwargs):
@@ -492,7 +498,7 @@ def instance_norm(x, counters={}, **kwargs):
     if 'scope' in kwargs.keys():
         name = get_name(kwargs['scope'], counters)
     else:
-        name = get_name('instance_norm_plus', counters)
+        name = get_name('instance_norm', counters)
 
     stop_grad = False
     if 'stop_grad' in kwargs.keys():
@@ -525,12 +531,22 @@ def layer_norm(x, counters={}, **kwargs):
         stop_grad = kwargs['stop_grad']
 
     in_shape = int_shape(x)
+    n_dims = len(in_shape)
+    norm_axis = []
+    if n_dims == 3:
+        # NLP task
+        norm_axis = [-1]
+    elif n_dims == 4:
+        norm_axis = [-1]
+    else:
+        raise ValueError("Please check the dims of input")
+
     with tf.variable_scope(name):
         gamma = get_variable(name+'_gamma', stop_grad, shape=[in_shape[-1]], dtype=tf.float32,
                               initializer=tf.constant_initializer(1.), trainable=True)
         beta = get_variable(name+'_beta', stop_grad, shape=[in_shape[-1]], dtype=tf.float32,
                                 initializer=tf.constant_initializer(0.), trainable=True)
-        mean, variance = tf.nn.moments(x, [1,2,3], keepdims=True)
+        mean, variance = tf.nn.moments(x, norm_axis, keepdims=True)
         out = tf.nn.batch_normalization(x, mean, variance, offset=beta, scale=gamma, variance_epsilon=1e-12, name='layer_norm')
         return out
 

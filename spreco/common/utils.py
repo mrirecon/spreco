@@ -275,6 +275,9 @@ def get_timestamp():
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 def export_model(saver, sess, path, name, as_text=False, gpu_id=None):
+    """
+    not needed will be delete in the future
+    """
     saver.save(sess, os.path.join(path, name))
     tf.train.write_graph(sess.graph, path, name+'.pb', as_text)
     if gpu_id is not None:
@@ -380,13 +383,10 @@ def print_parameters(file, mode="a"):
                 print("========layer=======")
                 print(variable)
                 shape = variable.get_shape()
-                print("shape->",shape)
-                print("shape->len",len(shape))
                 variable_parameters = 1
                 for dim in shape:
-                    print("dim->", dim)
                     variable_parameters *= dim
-                print(variable_parameters)
+                print("shape ->", shape, variable_parameters)
                 total_parameters += variable_parameters
             print(total_parameters)
 
@@ -436,7 +436,7 @@ def ssim(img1, img2, bit=16, tobit=False):
 
 def get_lr(step, lr, warmup_steps=None, hidden_size=None):
     """
-    learning rate scheduler
+    not used, learning rate scheduler
     """
     if warmup_steps is not None and hidden_size is not None:
         lr_base = lr * 0.002 # for Adam correction
@@ -445,3 +445,76 @@ def get_lr(step, lr, warmup_steps=None, hidden_size=None):
         return ret * lr_base
     else:
         return lr
+
+class LambdaWarmUpCosineScheduler:
+    """
+    note: use with a base_lr of 1.0
+    """
+    def __init__(self, warm_up_steps, lr_min, lr_max, lr_start, max_decay_steps, verbosity_interval=0):
+        self.lr_warm_up_steps = warm_up_steps
+        self.lr_start = lr_start
+        self.lr_min = lr_min
+        self.lr_max = lr_max
+        self.lr_max_decay_steps = max_decay_steps
+        self.last_lr = 0.
+        self.verbosity_interval = verbosity_interval
+
+    def schedule(self, n):
+        if self.verbosity_interval > 0:
+            if n % self.verbosity_interval == 0: print(f"current step: {n}, recent lr-multiplier: {self.last_lr}")
+        if n < self.lr_warm_up_steps:
+            lr = (self.lr_max - self.lr_start) / self.lr_warm_up_steps * n + self.lr_start
+            self.last_lr = lr
+            return lr
+        else:
+            t = (n - self.lr_warm_up_steps) / (self.lr_max_decay_steps - self.lr_warm_up_steps)
+            t = min(t, 1.0)
+            lr = self.lr_min + 0.5 * (self.lr_max - self.lr_min) * (
+                    1 + np.cos(t * np.pi))
+            self.last_lr = lr
+            return lr
+
+    def __call__(self, n):
+        return self.schedule(n)
+
+_RNG_SEED = None
+
+
+def fix_rng_seed(seed):
+    """
+    Call this function at the beginning of program to fix rng seed within tensorpack.
+
+    Args:
+        seed (int):
+
+    Note:
+        See https://github.com/tensorpack/tensorpack/issues/196.
+
+    Example:
+
+        Fix random seed in both tensorpack and tensorflow.
+
+    .. code-block:: python
+
+            seed = 42
+            utils.fix_rng_seed(seed)
+            tesnorflow.set_random_seed(seed)
+            # run trainer
+    """
+    global _RNG_SEED
+    _RNG_SEED = int(seed)
+
+def get_rng(obj=None):
+    """
+    Get a good RNG seeded with time, pid and the object.
+
+    Args:
+        obj: some object to use to generate random seed.
+    Returns:
+        np.random.RandomState: the RNG.
+    """
+    seed = (id(obj) + os.getpid() +
+            int(datetime.now().strftime("%Y%m%d%H%M%S%f"))) % 4294967295
+    if _RNG_SEED is not None:
+        seed = _RNG_SEED
+    return np.random.RandomState(seed)

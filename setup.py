@@ -9,10 +9,10 @@ setup(
         'tensorflow',
         'tf-slim==1.1.0',
         'numpy',
-        'pillow==8.2.0',
+        'pillow',
         'matplotlib',
         'scikit-image',
-        'pyyaml==5.4.1',
+        'pyyaml',
         'tqdm'
     ],
 )

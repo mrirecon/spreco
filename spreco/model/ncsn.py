@@ -19,16 +19,31 @@ class ncsn():
         self.nr_levels    = config['nr_levels']
         self.anneal_power = config['anneal_power']
         self.sigmas       = tf.exp(tf.linspace(tf.log(self.begin_sigma), tf.log(self.end_sigma), self.nr_levels))
-        self.inputs       = [tf.placeholder(tf.float32, 
+        self.seed         = config['seed']
+    
+
+    def init_placeholder(self, mode=0):
+
+        if mode == 0:
+            # train
+            self.learning_rate  = tf.placeholder(tf.float32, shape=[])
+            self.x              = [tf.placeholder(tf.float32, 
                                shape=[self.config['batch_size']]+self.config['input_shape'], name="input_%d"%i
                                ) for i in range(self.config['nr_gpu'])]
-        self.h            = [tf.placeholder(tf.int32,
-                               shape=[self.config['batch_size']]) for _ in range(config['nr_gpu'])]
-        self.ins_outs     = {'inputs': self.inputs, 'h': self.h}
-        self.learning_rate  = tf.placeholder(tf.float32, shape=[])
-        self.seed         = config['seed']
-        
-    
+            self.t            = [tf.placeholder(tf.int32,
+                               shape=[self.config['batch_size']]) for _ in range(self.config['nr_gpu'])]
+            self.ins_outs     = {'inputs': self.x, 't': self.t}
+
+        elif mode == 1:
+            # inference
+            self.x = tf.placeholder(tf.float32, shape=[self.config['batch_size']]+self.config['input_shape'])
+            self.t = tf.placeholder(tf.int32, shape=[self.config['batch_size']])
+
+        elif mode == 2:
+            # export
+            self.x = tf.placeholder(tf.float32, shape=[self.config['batch_size']]+self.config['input_shape'], name="input_0")
+            self.t = tf.placeholder(tf.int32, shape=[self.config['batch_size']], name="input_1")
+
     def denoise_score_matching(self, x):
 
         shape     = nn.int_shape(x)
@@ -54,7 +69,7 @@ class ncsn():
     
     def anneal_denoise_score_matching_v2(self, x, h):
         """
-        condition term h is not required
+        condition term h is not required for the network
         """
         shape     = nn.int_shape(x)
         sigs      = tf.gather(self.sigmas, h)[:, tf.newaxis, tf.newaxis, tf.newaxis]
@@ -67,11 +82,12 @@ class ncsn():
         loss      = tf.reduce_mean(1/2. * (tf.reduce_sum(tmp**2, axis=-1))*tf.squeeze(sigs)**self.anneal_power)
         return loss
     
-    def prep(self, export=True):
-        """make preparation for training objective"""
+    def init(self, mode=0):
+        
+        if mode == 0:
 
-        if not export:
-            _ = self.anneal_denoise_score_matching(self.inputs[0], self.h[0])
+            self.init_placeholder(mode)
+            _ = self.anneal_denoise_score_matching(self.x[0], self.t[0])
             all_params = tf.trainable_variables()
 
             loss      = []
@@ -79,18 +95,18 @@ class ncsn():
             loss_test = []
 
             optimizer = AdamOptimizer(self.learning_rate, beta1=0.9, beta2=0.999)
-        
+
             for i in range(self.config['nr_gpu']):
                 with tf.device('/gpu:%d'%i):
                     # train
-                    loss.append(self.anneal_denoise_score_matching(self.inputs[i], self.h[i]))
+                    loss.append(self.anneal_denoise_score_matching(self.x[i], self.t[i]))
 
                     gvs = optimizer.compute_gradients(loss[-1], all_params)
                     gvs = [(k, v) for (k, v) in gvs if k is not None]
                     grads.append(gvs)
 
                     # test
-                    loss_test.append(self.anneal_denoise_score_matching(self.inputs[i], self.h[i]))
+                    loss_test.append(self.anneal_denoise_score_matching(self.x[i], self.t[i]))
             
             with tf.device('/gpu:0'):
                 for i in range(1, self.config['nr_gpu']):
@@ -103,6 +119,13 @@ class ncsn():
             self.loss_train = loss[0]/self.config['nr_gpu']
             self.loss_test = loss_test[0]/self.config['nr_gpu']
 
+        elif mode == 1:
+            self.init_placeholder(mode)
+            _ = self.anneal_denoise_score_matching(self.x, self.t)
+
+        elif mode == 2:
+            self.init_placeholder(mode)
+            self.output = tf.squeeze(self.net.forward(self.x, self.t), name='output_0')
+
         else:
-            _ = self.anneal_denoise_score_matching(self.inputs[0], self.h[0])
-            all_params = tf.trainable_variables()
+            raise ValueError("Value for mode selection is wrong, only 0,1,2 are valid.")

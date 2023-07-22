@@ -1,19 +1,20 @@
-## Bayesian MRI reconstruction with joint uncertainty estimation using diffusion models
+## Spin generative image Priors for MR imaging RECOstruction (SPRECO)
 
-This package is to help you extract prior information for MRI image and then use it for MRI reconstruction. 
+This package is to help you train generative image priors for MRI image and then use it for MRI reconstruction. It has the following features:
+
+1. Distributed training
+2. Interruptible training
+3. Efficient dataloader for medical images
+4. Customizable with a configuration file
 
 ## Installation
-
-1. Install with pip command
-   ```shell
-   $ pip install spreco
-   ```
 
 2. Clone this repository and use [conda](https://www.anaconda.com/products/individual) to set up the environment.
 
    ```shell
-   $ git clone https://github.com/mrirecon/spreco.git
+   $ git clone https://github.com/ggluo/spreco.git
    $ cd spreco
+   $ git checkout devel
    $ conda env create --file env.yml -n work
    $ conda activate work
    $ pip install .
