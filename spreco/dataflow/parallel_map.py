@@ -5,9 +5,9 @@ import threading
 from six.moves import queue
 
 from spreco.dataflow.concurrency import StoppableThread
-from spreco.dataflow.base import DataFlow, DataFlowReentrantGuard, ProxyDataFlow
-from spreco.dataflow.common import RepeatedData
-
+from spreco.dataflow.base import DataFlow, DataFlowReentrantGuard, ProxyDataFlow, RNGDataFlow
+from spreco.dataflow.common import RepeatedData, BatchData
+import numpy as np
 
 __all__ = ['MultiThreadMapData']
 
@@ -201,6 +201,29 @@ class MultiThreadMapData(_ParallelMapData):
             # if p.is_alive():
             #     logger.warn("Cannot join thread {}.".format(p.name))
 
+class cfl_pipe(RNGDataFlow):
+
+    def __init__(self, files, shuffle):
+        self._size   = len(files)
+        self.files   = files
+        self.shuffle = shuffle
+    
+    def __len__(self):
+        return len(self.files)
+    
+    def __iter__(self):
+        idxs = np.arange(self._size)
+        if self.shuffle:
+            self.rng.shuffle(idxs)
+        
+        for idx in idxs:
+            fname = self.files[idx]
+            yield fname
+
+def dataloader(filelist, num_thread, map_func, batchsize, buffer_factor=5, shuffle=True):
+    d1 = cfl_pipe(filelist, shuffle)
+    d1 = MultiThreadMapData(d1, num_thread, map_func, buffer_size=batchsize*buffer_factor, strict=True)
+    return BatchData(d1, batchsize, use_list=False)
 
 if __name__ == '__main__':
     import time

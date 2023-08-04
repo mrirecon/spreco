@@ -65,7 +65,7 @@ class sde():
         elif typ == 'linear':
             sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * t
         elif typ == 'log':
-            sigma = self.sigma_min +self.sigma_max*tf.math.log((tf.math.exp(1.)-1.)*t + 1.) # TODO (sigma_max-sigma_min)
+            sigma = self.sigma_min +self.sigma_max*tf.math.log((tf.math.exp(1.)-1.)*t + 1.) # TODO replace sigma_max with (sigma_max-sigma_min) 
         elif typ == 'sqrt':
             sigma = self.sigma_min + (self.sigma_max - self.sigma_min) * t**0.5
         else:

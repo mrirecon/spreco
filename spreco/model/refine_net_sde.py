@@ -177,7 +177,7 @@ class cond_refine_net_plus():
             proj_t = nn.embed_t(tf.math.log(t), embedding_size=self.nr_filters, scale=self.fourier_scale)
 
             proj_t = nn.nin(proj_t, self.nr_filters * 2, self.nonlinearity)
-            proj_t = nn.nin(proj_t, self.nr_filters*4, nonlinearity=None)
+            proj_t = nn.nin(proj_t, self.nr_filters*4, nonlinearity=None)  # for mrm paper, without nonlinearity=None
 
             x_level_0 = nn.conv2d_plus(x, num_filters=1*self.nr_filters, nonlinearity=None)
             x_level_1_0 = cond_res_block(x_level_0, h=proj_t, out_filters=1*self.nr_filters, rescale=False)
