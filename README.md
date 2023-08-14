@@ -1,6 +1,6 @@
 ## Speed up MR scanner with generative priors for image reconstruction (SPRECO)
 
-<img src="./misc/overview.png" alt="workflow" width="400" align="right"/>
+<img src="./misc/overview.png" alt="workflow" width="350" align="right"/>
 This package is to help you train generative image priors of MRI images and then use them in image reconstruction. It has the following features:
 
 1. Distributed training
