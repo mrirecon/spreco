@@ -31,6 +31,7 @@ $ pip install .
 
 ## Reference 
 We would appreciate it if you tried our codes and cited our work.
+
 [1] G. Luo, X. Wang, M. Blumenthal, M. Schilling, EHU. Rauf, R. Kotikalapudi, NK. Focke, M. Uecker. arXiv preprint arXiv:2308.02340 (2023)
 
 [2] G. Luo, M. Blumenthal, M. Heide, M. Uecker. Bayesian MRI reconstruction with joint uncertainty estimation using diffusion models. Magn Reson Med. 2023; 1-17
